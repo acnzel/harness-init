@@ -1,0 +1,132 @@
+name: Post-Merge Docs Update
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - dev
+      - prod
+
+jobs:
+  update-docs:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Detect changed files
+        id: changed
+        run: |
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.merge_commit_sha }}"
+
+          CHANGED=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          echo "changed_files<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGED" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          # views.py 변경 여부 감지
+          if echo "$CHANGED" | grep -q "views.py"; then
+            echo "has_view_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_view_changes=false" >> $GITHUB_OUTPUT
+          fi
+
+          # CLAUDE.md 변경 여부 감지
+          if echo "$CHANGED" | grep -q "CLAUDE.md"; then
+            echo "has_claude_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_claude_changes=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update CHANGELOG
+        run: |
+          mkdir -p docs
+
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          PR_AUTHOR="${{ github.event.pull_request.user.login }}"
+          MERGED_AT="${{ github.event.pull_request.merged_at }}"
+          BRANCH="${{ github.event.pull_request.base.ref }}"
+          DATE=$(echo "$MERGED_AT" | cut -c1-10)
+
+          CHANGELOG="docs/CHANGELOG.md"
+
+          if [ ! -f "$CHANGELOG" ]; then
+            echo "# Changelog" > "$CHANGELOG"
+            echo "" >> "$CHANGELOG"
+          fi
+
+          # 신규 항목을 파일 상단에 삽입
+          ENTRY="## [$DATE] #$PR_NUMBER — $PR_TITLE\n- **Branch**: $BRANCH\n- **Author**: @$PR_AUTHOR\n- **Changed files**:\n"
+
+          echo "${{ steps.changed.outputs.changed_files }}" | while IFS= read -r file; do
+            [ -n "$file" ] && ENTRY="${ENTRY}  - \`$file\`\n"
+          done
+
+          ENTRY="${ENTRY}\n"
+
+          # 기존 내용 앞에 삽입
+          TMPFILE=$(mktemp)
+          head -n 2 "$CHANGELOG" > "$TMPFILE"
+          printf "$ENTRY" >> "$TMPFILE"
+          tail -n +3 "$CHANGELOG" >> "$TMPFILE"
+          mv "$TMPFILE" "$CHANGELOG"
+
+      - name: Create API docs update PR (if views changed)
+        if: steps.changed.outputs.has_view_changes == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const prTitle = context.payload.pull_request.title;
+            const changedFiles = `${{ steps.changed.outputs.changed_files }}`;
+
+            const viewFiles = changedFiles.split('\n')
+              .filter(f => f.includes('views.py'))
+              .map(f => `- \`${f}\``)
+              .join('\n');
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[DOCS] API 문서 갱신 필요 — #${prNumber} ${prTitle}`,
+              body: [
+                '## 개요',
+                `PR #${prNumber} 머지로 인해 아래 views.py 파일이 변경되었습니다.`,
+                '`docs/api/` 문서를 현재 코드와 동기화해주세요.',
+                '',
+                '## 변경된 Views 파일',
+                viewFiles,
+                '',
+                '## 작업 방법',
+                '1. 각 views.py의 엔드포인트 변경사항 확인',
+                '2. `docs/api/{app}.md` 파일 갱신 (추가·수정·삭제된 엔드포인트 반영)',
+                '3. 이 이슈를 참조하는 PR 생성 후 머지',
+                '',
+                '> 이 이슈는 `post-merge-docs.yml` 워크플로우에 의해 자동 생성되었습니다.'
+              ].join('\n'),
+              labels: ['documentation']
+            });
+
+      - name: Commit CHANGELOG update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet docs/CHANGELOG.md; then
+            echo "No CHANGELOG changes to commit"
+            exit 0
+          fi
+
+          git add docs/CHANGELOG.md
+          git commit -m "docs: CHANGELOG 자동 갱신 — PR #${{ github.event.pull_request.number }}"
+          git push

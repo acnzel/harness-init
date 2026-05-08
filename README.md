@@ -57,12 +57,11 @@ cd ./my-new-project
 bash ~/harness-init/init.sh
 ```
 
-`package.json` → Next.js, `requirements.txt` / `pyproject.toml` → Django 자동 감지.
+`requirements.txt` / `pyproject.toml` / `manage.py` → Django 자동 감지. 그 외는 base로 폴백.
 
 ### 스택 명시
 
 ```bash
-bash ~/harness-init/init.sh nextjs
 bash ~/harness-init/init.sh django
 bash ~/harness-init/init.sh base   # 스택 무관 공통만
 ```
@@ -148,7 +147,6 @@ mkdir my-saas && cd my-saas
 git init
 
 # 2. harness 초기화
-bash ~/harness-init/init.sh nextjs
 
 # 3. Claude Code 실행 후 브레인스토밍
 # > /brainstorm
@@ -173,7 +171,6 @@ harness-init/
 ├── init.sh                      # 메인 실행 스크립트
 ├── templates/
 │   ├── base/                    # 스택 무관 공통 템플릿
-│   ├── nextjs/                  # Next.js 추가 내용
 │   └── django/                  # Django 추가 내용
 └── scripts/
     ├── detect-stack.sh          # 스택 자동 감지
@@ -185,4 +182,4 @@ harness-init/
 ## 커스터마이징
 
 `templates/base/CLAUDE.md`를 수정하면 모든 새 프로젝트에 적용됩니다.
-스택별 내용은 `templates/nextjs/CLAUDE.md`, `templates/django/CLAUDE.md`를 수정하세요.
+스택별 내용은 `templates/django/CLAUDE.md`를 수정하세요.

@@ -152,17 +152,17 @@ replace_in_file() {
   [ -f "$file" ] || return
 
   perl -pi -e "
-    s/Django 백엔드/${STACK_LABEL} 백엔드/g;
-    s/django 백엔드/${STACK_LABEL} 백엔드/g;
-    s/Django \{version\}/${STACK_LABEL} {version}/g;
-    s/Django 앱/${STACK_LABEL} 모듈/g;
-    s/Views → Services → Repositories/${LAYER_PATTERN}/g;
-    s/Views에서 DB/${LAYER_TOP}에서 DB/g;
-    s/Views에서 비즈니스/${LAYER_TOP}에서 비즈니스/g;
-    s|utils/factories\.py의 Factory|${FACTORY_DESC}|g;
+    s|Django 백엔드|${STACK_LABEL} 백엔드|g;
+    s|django 백엔드|${STACK_LABEL} 백엔드|g;
+    s|Django \{version\}|${STACK_LABEL} {version}|g;
+    s|Django 앱|${STACK_LABEL} 모듈|g;
+    s|Views → Services → Repositories|${LAYER_PATTERN}|g;
+    s|Views에서 DB|${LAYER_TOP}에서 DB|g;
+    s|Views에서 비즈니스|${LAYER_TOP}에서 비즈니스|g;
+    s|utils/factories\\.py의 Factory|${FACTORY_DESC}|g;
     s|Factory/PropertyMock 기반 pytest|${FACTORY_DESC} 기반 ${TEST_TOOL}|g;
-    s/\bpytest\b/${TEST_TOOL}/g;
-    s/python manage\.py test/${TEST_CMD}/g;
+    s|\\bpytest\\b|${TEST_TOOL}|g;
+    s|python manage\\.py test|${TEST_CMD}|g;
   " "$file" 2>/dev/null || true
 }
 
@@ -212,7 +212,7 @@ jobs:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
           restore-keys: ${{ runner.os }}-pip-
-      - run: pip install -r requirements/txt/local.txt
+      - run: pip install -r requirements.txt
       - run: pytest
         env:
           PYTHONUNBUFFERED: 1

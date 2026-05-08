@@ -54,14 +54,8 @@ cd ./my-new-project
 bash ~/harness-init/init.sh
 ```
 
-`requirements.txt` / `pyproject.toml` / `manage.py` → Django 자동 감지. 그 외는 base로 폴백.
-
-### 스택 명시
-
-```bash
-bash ~/harness-init/init.sh django
-bash ~/harness-init/init.sh base   # 스택 무관 공통만
-```
+`requirements.txt` / `pyproject.toml` / `manage.py` → Django 자동 감지.
+비 Django 프로젝트는 설치 후 자동으로 `migration.sh`가 해당 스택에 맞게 내용을 적용합니다.
 
 ### 실행 결과
 
@@ -163,16 +157,15 @@ harness-init/
 ├── README.md
 ├── init.sh                      # 메인 실행 스크립트
 ├── templates/
-│   ├── base/                    # 스택 무관 공통 템플릿
-│   └── django/                  # Django 추가 내용
+│   └── django/                  # harness 템플릿 (django 기반, 타 스택으로 자동 마이그레이션)
 └── scripts/
-    ├── detect-stack.sh          # 스택 자동 감지
-    └── merge-claude-md.sh       # CLAUDE.md 합치기
+    ├── migration.sh             # 스택 자동 감지 + 비 Django 스택 harness 적응
+    └── merge-claude-md.sh       # CLAUDE.md 주입
 ```
 
 ---
 
 ## 커스터마이징
 
-`templates/base/CLAUDE.md`를 수정하면 모든 새 프로젝트에 적용됩니다.
-스택별 내용은 `templates/django/CLAUDE.md`를 수정하세요.
+`templates/django/CLAUDE.md`와 `.claude/agents/*.md`를 수정하면 모든 새 프로젝트에 적용됩니다.
+비 Django 스택은 `scripts/migration.sh`의 `configure_stack()` 함수에 스택별 설정을 추가하세요.

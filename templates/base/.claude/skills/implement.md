@@ -16,10 +16,10 @@ triggers: ["/implement"]
 1. **컨텍스트 파악**
    - CLAUDE.md 아키텍처 규칙 확인
    - 관련 기존 코드 탐색
-   - `docs/superpowers/specs/`에 관련 설계 문서 있으면 읽기
+   - `.claude/decisions/`에서 관련 ADR 확인
 
 2. **구현 범위 확인**
-   - `docs/superpowers/plans/`에 구현 계획 있으면 해당 태스크 확인
+   - `.claude/tasks/`에 작업 상태 파일 있으면 해당 태스크 확인
    - 없으면 사용자와 범위 합의
 
 3. **구현**

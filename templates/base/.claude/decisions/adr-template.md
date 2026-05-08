@@ -30,5 +30,5 @@
 
 ## 관련 문서
 
-- `docs/superpowers/specs/` 관련 설계 문서
+- `docs/` 관련 설계 문서
 - 관련 ADR 링크

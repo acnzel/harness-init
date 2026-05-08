@@ -117,12 +117,6 @@ else
   success ".gitignore 생성 완료"
 fi
 
-# ── docs/superpowers 디렉토리 ──────────────────────────
-mkdir -p "$TARGET_DIR/docs/superpowers/specs"
-mkdir -p "$TARGET_DIR/docs/superpowers/plans"
-touch "$TARGET_DIR/docs/superpowers/specs/.gitkeep"
-touch "$TARGET_DIR/docs/superpowers/plans/.gitkeep"
-success "docs/superpowers 디렉토리 생성 완료"
 
 # ── 완료 메시지 ────────────────────────────────────────
 echo ""
@@ -142,14 +136,12 @@ echo "  ├── .claude/commands/       (/review 슬래시 커맨드)"
 echo "  ├── .claude/settings.json"
 echo "  ├── .gemini/                (Gemini Code Assist 설정)"
 echo "  ├── .github/                (이슈 템플릿, PR 템플릿, 워크플로우)"
-echo "  ├── docs/DOC_SYNC_POLICY.md (문서 동기화 정책)"
+echo "  ├── docs/DOC-SYNC-POLICY.md  (문서 동기화 정책)"
 fi
-echo "  └── docs/superpowers/       (specs & plans)"
 echo ""
 if [ "$STACK" = "django" ]; then
 echo "  에이전트 팀 (orchestrator 스킬):"
-echo "  ticket-analyzer → layered-architect → django-implementer"
-echo "  ↔ factory-test-author → layer-rule-reviewer"
+echo "  analyst → architect → coder ⇄ tester → reviewer"
 echo ""
 echo "  슬래시 커맨드:"
 echo "  /orchestrator   /review   /explore   /implement   /debug"
@@ -158,6 +150,3 @@ echo "  GitHub Actions:"
 echo "  claude-code-review · claude · pr-auto-fill · pr-test · post-merge-docs"
 echo ""
 fi
-echo "  워크플로우:"
-echo "  /brainstorm → /writing-plans → /orchestrator"
-echo ""

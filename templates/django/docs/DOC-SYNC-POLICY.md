@@ -21,7 +21,7 @@
 | 코딩 컨벤션 | `CLAUDE.md` | 규칙 변경·예외 추가 | 오케스트레이터 자동 반영 |
 | 변경 이력 리뷰 | `reviews/` | 매 티켓 작업 완료 후 | 오케스트레이터 (Phase 8) |
 | 배포 가이드 | `docs/deployment.md` | 배포 방식 변경 | DevOps 담당자 |
-| 이 문서 | `docs/DOC_SYNC_POLICY.md` | 정책 변경 시 | 팀 합의 후 갱신 |
+| 이 문서 | `docs/DOC-SYNC-POLICY.md` | 정책 변경 시 | 팀 합의 후 갱신 |
 
 ---
 
@@ -42,7 +42,7 @@
 
 - 코드와 문서 간 불일치 탐색
 - 오래된 ADR 아카이브 처리
-- `DOC_SYNC_POLICY.md` 자체 검토
+- `DOC-SYNC-POLICY.md` 자체 검토
 
 ---
 

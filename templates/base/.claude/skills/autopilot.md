@@ -1,6 +1,6 @@
 ---
 name: autopilot
-description: PRD/설계 문서와 구현 계획을 바탕으로 완성까지 자율 실행
+description: 작업 계획을 바탕으로 완성까지 자율 실행
 triggers: ["/autopilot"]
 ---
 
@@ -8,17 +8,17 @@ triggers: ["/autopilot"]
 
 ## 목적
 
-`docs/superpowers/` 하위의 설계 문서와 구현 계획을 읽고,
+`.claude/tasks/` 하위의 작업 상태 파일을 읽고,
 모든 태스크가 완료될 때까지 구현 → 검증 → 수정 루프를 반복합니다.
 
 ## 사전 조건
 
 아래 중 하나 이상이 존재해야 합니다.
 
-- `docs/superpowers/plans/` 에 구현 계획 파일 (writing-plans 결과)
-- `docs/superpowers/specs/` 에 설계 문서 (brainstorming 결과)
+- `.claude/tasks/` 에 작업 상태 파일
+- 사용자가 직접 전달한 구현 목표
 
-없다면 먼저 `/brainstorm` → `/writing-plans` 순서로 진행하세요.
+없다면 먼저 사용자와 목표를 합의한 뒤 `.claude/tasks/[작업명].md`를 생성하세요.
 
 ## 실행 절차
 
@@ -26,20 +26,17 @@ triggers: ["/autopilot"]
 
 ```
 1. CLAUDE.md 읽기 (아키텍처 규칙, 개발 명령어)
-2. docs/superpowers/plans/ 에서 최신 plan 파일 읽기
-3. docs/superpowers/specs/ 에서 관련 design 파일 읽기
-4. .claude/decisions/ 에서 ADR 읽기
-5. .claude/tasks/ 에서 기존 작업 상태 확인
+2. .claude/tasks/ 에서 작업 상태 파일 읽기
+3. .claude/decisions/ 에서 ADR 읽기
 ```
 
 ### 2단계: 태스크 분해 및 상태 파일 생성
 
-plan 파일의 체크박스 기반으로 `.claude/tasks/[feature].md` 생성:
+`.claude/tasks/[feature].md` 형식:
 
 ```markdown
 # [기능명] 작업 상태
 
-**소스:** docs/superpowers/plans/YYYY-MM-DD-feature.md
 **시작:** YYYY-MM-DD
 **상태:** 진행 중
 
@@ -61,8 +58,8 @@ plan 파일의 체크박스 기반으로 `.claude/tasks/[feature].md` 생성:
 각 태스크에 대해:
 
 ```
-1. plan의 해당 태스크 상세 읽기
-2. 관련 기존 코드 확인 (/explore 참고)
+1. 해당 태스크 상세 확인
+2. 관련 기존 코드 탐색 (/explore 참고)
 3. 구현
 4. 빌드/린트/테스트 실행
 5. 실패 시 → 오류 분석 후 수정 (/debug 참고)
@@ -73,10 +70,10 @@ plan 파일의 체크박스 기반으로 `.claude/tasks/[feature].md` 생성:
 
 아래 모두 충족 시 종료:
 
-- [ ] plan의 모든 체크박스 완료
+- [ ] 모든 태스크 완료
 - [ ] 빌드 통과
 - [ ] 린트 오류 없음
-- [ ] specs의 요구사항과 대조 확인
+- [ ] 요구사항과 대조 확인
 
 ### 5단계: 완료 리포트
 
@@ -84,7 +81,6 @@ plan 파일의 체크박스 기반으로 `.claude/tasks/[feature].md` 생성:
 ## Autopilot 완료 리포트
 
 **구현된 태스크:** N개
-**소요 시간:** -
 **생성/수정 파일:** [목록]
 **미완료 항목:** [있으면 이유와 함께 기록]
 ```
@@ -93,7 +89,7 @@ plan 파일의 체크박스 기반으로 `.claude/tasks/[feature].md` 생성:
 
 아래 상황에서는 사용자에게 확인 요청:
 
-- 설계 문서에 없는 큰 아키텍처 결정이 필요한 경우
+- 명세에 없는 큰 아키텍처 결정이 필요한 경우
 - 외부 서비스 연동 (API 키, 환경변수 등)이 필요한 경우
 - 기존 코드를 대규모로 변경해야 하는 경우
 - 동일한 오류가 3회 이상 반복되는 경우

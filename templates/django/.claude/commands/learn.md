@@ -20,21 +20,22 @@ argument-hint: "[skill-name]"
 
 ### 2. 스킬 이름 결정
 
-- 인수가 제공된 경우: `$ARGUMENTS` 를 스킬명으로 사용
+- 인수가 제공된 경우: `$ARGUMENTS` 를 소문자-하이픈(kebab-case) 형식으로 변환하여 스킬명으로 사용
 - 인수가 없는 경우: 인사이트 내용에서 소문자-하이픈 형식으로 이름 생성
   - 예: `django-db-table-naming`, `permission-layer-split`, `cash-lock-state-mismatch`
 
 ### 3. 스킬 파일 작성
 
 `.claude/skills/{skill-name}.md` 에 저장:
+- 동일 이름 파일이 이미 존재하면 기존 내용을 보여주고 덮어쓸지 사용자에게 확인한 후 진행
 
 ```markdown
 ---
 name: {skill-name}
 description: {한 줄 설명}
 triggers:
-  - {트리거 키워드 1}
-  - {트리거 키워드 2}
+  - {관련 코드 패턴 (예: 함수명, 데코레이터, 에러 메시지 일부)}
+  - {특정 파일 경로 또는 핵심 도메인 용어}
 ---
 
 # {스킬 제목}

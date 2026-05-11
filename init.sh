@@ -19,6 +19,29 @@ info()    { echo -e "${BLUE}[harness]${NC} $1"; }
 success() { echo -e "${GREEN}[harness]${NC} ✓ $1"; }
 warn()    { echo -e "${YELLOW}[harness]${NC} $1"; }
 
+# ── 환경 선택 ──────────────────────────────────────────
+if [ -z "$ENV_TYPE" ]; then
+  if [ -t 0 ]; then
+    echo ""
+    echo -e "${BLUE}  어떤 환경으로 구축 예정이신가요?${NC}"
+    echo "  1) Python  (Django / FastAPI / Flask)"
+    echo "  2) JS / TS (Next.js / NestJS / Express)"
+    echo "  3) 모름    (자동 감지)"
+    echo ""
+    printf "  선택 [1-3]: "
+    read -r ENV_CHOICE || ENV_CHOICE="3"
+
+    case "$ENV_CHOICE" in
+      1) ENV_TYPE="python" ;;
+      2) ENV_TYPE="js"     ;;
+      *) ENV_TYPE="auto"   ;;
+    esac
+    echo ""
+  else
+    ENV_TYPE="auto"
+  fi
+fi
+
 # ── 스택 감지 ──────────────────────────────────────────
 STACK=$(bash "$SCRIPT_DIR/scripts/migration.sh" --detect "$TARGET_DIR")
 info "감지된 스택: $STACK"
@@ -87,6 +110,17 @@ if [ -d "$TEMPLATE_DIR/django/docs" ]; then
   success "docs 설치 완료"
 fi
 
+# DOMAIN.md 복사 (JS: 정적 템플릿 / Python: domain-init.sh가 동적 생성)
+IS_JS_ENV() { [ "$ENV_TYPE" = "js" ] || { [ "$ENV_TYPE" = "auto" ] && [[ "$STACK" =~ ^(nextjs|nestjs|express|node)$ ]]; }; }
+if IS_JS_ENV; then
+  if [ ! -f "$TARGET_DIR/DOMAIN.md" ]; then
+    cp "$TEMPLATE_DIR/js/DOMAIN.md" "$TARGET_DIR/DOMAIN.md"
+    success "DOMAIN.md 템플릿 생성 완료 (JS용 — TODO 항목 채우기 필요)"
+  else
+    warn "DOMAIN.md 이미 존재, 건너뜀"
+  fi
+fi
+
 # ── .gitignore 업데이트 ────────────────────────────────
 GITIGNORE="$TARGET_DIR/.gitignore"
 APPEND_FILE="$TEMPLATE_DIR/django/.gitignore.append"
@@ -105,16 +139,26 @@ else
 fi
 
 # ── pre-commit 설정 ────────────────────────────────────
-# 스택별 적합한 yaml 선택 (java/spring 계열은 생략)
-case "$STACK" in
-  nextjs|nestjs|express|node)
-    PRECOMMIT_YAML="$TEMPLATE_DIR/js/.pre-commit-config.yaml"
-    ;;
-  django|fastapi|flask)
+# ENV_TYPE 우선, 그 외에는 스택 자동 감지 (java/spring 계열은 생략)
+case "$ENV_TYPE" in
+  python)
     PRECOMMIT_YAML="$TEMPLATE_DIR/django/.pre-commit-config.yaml"
     ;;
+  js)
+    PRECOMMIT_YAML="$TEMPLATE_DIR/js/.pre-commit-config.yaml"
+    ;;
   *)
-    PRECOMMIT_YAML=""
+    case "$STACK" in
+      nextjs|nestjs|express|node)
+        PRECOMMIT_YAML="$TEMPLATE_DIR/js/.pre-commit-config.yaml"
+        ;;
+      django|fastapi|flask)
+        PRECOMMIT_YAML="$TEMPLATE_DIR/django/.pre-commit-config.yaml"
+        ;;
+      *)
+        PRECOMMIT_YAML=""
+        ;;
+    esac
     ;;
 esac
 
@@ -170,7 +214,7 @@ EXISTING_MODELS=$(find "$TARGET_DIR" -name "models.py" \
   ! -path "*/.git/*" \
   2>/dev/null | head -1)
 
-if [ -n "$EXISTING_MODELS" ]; then
+if ! IS_JS_ENV && [ -n "$EXISTING_MODELS" ]; then
   info "기존 Django 앱 감지 — DOMAIN.md 스켈레톤 생성 중..."
   bash "$SCRIPT_DIR/scripts/domain-init.sh" "$TARGET_DIR"
 fi
@@ -195,8 +239,10 @@ echo "  ├── .claude/settings.json"
 echo "  ├── .gemini/                 (Gemini Code Assist 설정)"
 echo "  ├── .github/                 (이슈 템플릿, PR 템플릿, 워크플로우)"
 echo "  ├── docs/DOC-SYNC-POLICY.md  (문서 동기화 정책)"
-  if [ -n "$EXISTING_MODELS" ]; then
-    echo "  └── DOMAIN.md + 앱별 DOMAIN.md  (기존 프로젝트 — TODO 항목 채우기 필요)"
+  if IS_JS_ENV; then
+    echo "  └── DOMAIN.md  (JS 템플릿 — TODO 항목 채우기 필요)"
+  elif [ -n "$EXISTING_MODELS" ]; then
+    echo "  └── DOMAIN.md + 앱별 DOMAIN.md  (기존 Django 프로젝트 — TODO 항목 채우기 필요)"
   else
     echo "  └── (DOMAIN.md: 신규 프로젝트 — 앱 개발 후 domain-init.sh 실행)"
   fi
@@ -210,3 +256,23 @@ echo ""
 echo "  GitHub Actions:"
 echo "  claude-code-review · claude · pr-auto-fill · pr-test · post-merge-docs"
 echo ""
+
+if IS_JS_ENV; then
+  echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo -e "${YELLOW}  📝 DOMAIN.md 작성 가이드 (JS/TS 환경)${NC}"
+  echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo ""
+  echo "  DOMAIN.md 에 사용 중인 ORM/스키마 라이브러리의 도메인 지식을 채워두세요."
+  echo "  AI 에이전트가 코드 작성 전 이 문서를 참조합니다."
+  echo ""
+  echo "  라이브러리별 스키마 위치 힌트:"
+  echo "  · Prisma    → prisma/schema.prisma"
+  echo "  · TypeORM   → src/**/*.entity.ts"
+  echo "  · Mongoose  → src/**/*.schema.ts"
+  echo "  · Drizzle   → src/db/schema.ts"
+  echo ""
+  echo "  자동화 힌트 (스크립트로 스켈레톤 생성하고 싶다면):"
+  echo "  Django용 자동 생성 스크립트를 참고해 ORM에 맞게 응용하세요:"
+  echo "  → $(dirname "$0")/scripts/domain-init.sh"
+  echo ""
+fi

@@ -74,6 +74,7 @@ bash ~/harness-init/init.sh
 ```
 my-project/
 ├── CLAUDE.md                         ← 코딩 원칙·레이어 규칙·팀 트리거
+├── .pre-commit-config.yaml           ← pre-commit-hooks + ruff (자동 설치·등록)
 ├── DOMAIN.md                         ← 도메인 인덱스 (기존 프로젝트만)
 ├── {app}/DOMAIN.md                   ← 앱별 도메인 문서 스켈레톤 (기존 프로젝트만)
 ├── .gitignore                        ← .claude/local/ 등 제외
@@ -125,6 +126,32 @@ my-project/
 | `domain-update-reminder.sh` | Edit / Write 후 | `models.py` 변경 시 DOMAIN.md 갱신 체크리스트 출력, `services.py`/`views.py` 변경 시 흐름 업데이트 권고 |
 
 훅은 `git diff --name-only HEAD`로 변경 파일을 감지합니다. 프로젝트별 훅을 추가하려면 `.claude/hooks/`에 `.sh` 파일을 추가하고 `settings.json`의 `hooks` 섹션에 등록하세요.
+
+---
+
+## pre-commit — 자동 코드 품질 게이트
+
+`init.sh` 실행 시 `.pre-commit-config.yaml` 생성 + `pre-commit install`까지 자동 완료합니다.
+
+### 기본 포함 훅
+
+| 훅 | 역할 |
+|----|------|
+| `pre-commit-hooks` | trailing-whitespace, end-of-file-fixer, check-yaml/json/toml, check-merge-conflict, debug-statements, large-files |
+| `ruff` | Python 린팅 + 자동 수정 (`--fix`) |
+| `ruff-format` | Python 코드 포맷팅 (black 호환) |
+
+### 버전 업데이트
+
+```bash
+pre-commit autoupdate   # 모든 훅을 최신 버전으로 업데이트
+```
+
+### 수동 전체 실행
+
+```bash
+pre-commit run --all-files
+```
 
 ---
 

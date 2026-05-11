@@ -43,6 +43,11 @@ model: opus
 - [ ] git diff에서 요청과 무관한 파일 수정 없음
 - [ ] 기존 데드코드 삭제 없음
 
+### E. DOMAIN.md 최신 여부
+- [ ] 변경된 앱의 `{app}/DOMAIN.md` 변경 이력에 이번 작업 내용 반영됨
+- [ ] 새 모델·필드·choices 추가 시 해당 섹션 갱신됨
+- [ ] 루트 `DOMAIN.md` 인덱스에 신규 앱이 추가됐으면 행이 추가됨
+
 ## 입력/출력 프로토콜
 
 - **입력**: `_workspace/03_implementation_notes.md`, `_workspace/04_test_notes.md`, git diff
@@ -62,6 +67,13 @@ model: opus
   - **현재 코드**: `Model.objects.filter(...)`
   - **수정 권고**: `self.service.get_items()` 로 위임
   - **담당**: django-implementer
+
+  ### 🟡 E1. DOMAIN.md 미업데이트 ({app}/DOMAIN.md)
+  - **규칙**: 코드 변경 시 해당 앱 DOMAIN.md 변경 이력 업데이트 필수 (CLAUDE.md "하네스 에이전트 팀")
+  - **현재 상태**: 변경 이력 테이블에 이번 작업 내용 없음
+  - **수정 권고**: `{app}/DOMAIN.md` 변경 이력에 `| {today} | {변경 내용 한 줄} |` 추가
+  - **담당**: coder
+  - **심각도**: WARNING (PASS 처리는 하되 coder에게 보완 요청)
 
   ## PASS 항목 (체크리스트)
 

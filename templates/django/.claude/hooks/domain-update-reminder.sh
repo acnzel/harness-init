@@ -2,15 +2,18 @@
 # PostToolUse(Edit, Write) 훅
 # models.py / services.py / views.py 변경 시 DOMAIN.md 업데이트를 상기시킨다.
 
-CHANGED_FILES=$(git diff --name-only HEAD 2>/dev/null || echo "")
-
 MODEL_CHANGED=false
 SERVICE_CHANGED=false
 
-for file in $CHANGED_FILES; do
-  [[ "$file" == *"models.py"* ]] && MODEL_CHANGED=true
-  [[ "$file" == *"services.py"* || "$file" == *"views.py"* ]] && SERVICE_CHANGED=true
-done
+# HEAD가 없는 신규 저장소에서는 ls-files를 폴백으로 사용
+FILES=$(git diff --name-only HEAD 2>/dev/null || git ls-files -m -o --exclude-standard)
+
+if echo "$FILES" | grep -qE '(^|/)models\.py$'; then
+  MODEL_CHANGED=true
+fi
+if echo "$FILES" | grep -qE '(^|/)(services|views)\.py$'; then
+  SERVICE_CHANGED=true
+fi
 
 if [ "$MODEL_CHANGED" = true ]; then
   echo ""

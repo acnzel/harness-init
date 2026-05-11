@@ -19,6 +19,23 @@ info()    { echo -e "${BLUE}[harness]${NC} $1"; }
 success() { echo -e "${GREEN}[harness]${NC} ✓ $1"; }
 warn()    { echo -e "${YELLOW}[harness]${NC} $1"; }
 
+# ── 환경 선택 ──────────────────────────────────────────
+echo ""
+echo -e "${BLUE}  어떤 환경으로 구축 예정이신가요?${NC}"
+echo "  1) Python  (Django / FastAPI / Flask)"
+echo "  2) JS / TS (Next.js / NestJS / Express)"
+echo "  3) 모름    (자동 감지)"
+echo ""
+printf "  선택 [1-3]: "
+read -r ENV_CHOICE
+
+case "$ENV_CHOICE" in
+  1) ENV_TYPE="python" ;;
+  2) ENV_TYPE="js"     ;;
+  *) ENV_TYPE="auto"   ;;
+esac
+echo ""
+
 # ── 스택 감지 ──────────────────────────────────────────
 STACK=$(bash "$SCRIPT_DIR/scripts/migration.sh" --detect "$TARGET_DIR")
 info "감지된 스택: $STACK"
@@ -105,16 +122,26 @@ else
 fi
 
 # ── pre-commit 설정 ────────────────────────────────────
-# 스택별 적합한 yaml 선택 (java/spring 계열은 생략)
-case "$STACK" in
-  nextjs|nestjs|express|node)
-    PRECOMMIT_YAML="$TEMPLATE_DIR/js/.pre-commit-config.yaml"
-    ;;
-  django|fastapi|flask)
+# ENV_TYPE 우선, 그 외에는 스택 자동 감지 (java/spring 계열은 생략)
+case "$ENV_TYPE" in
+  python)
     PRECOMMIT_YAML="$TEMPLATE_DIR/django/.pre-commit-config.yaml"
     ;;
+  js)
+    PRECOMMIT_YAML="$TEMPLATE_DIR/js/.pre-commit-config.yaml"
+    ;;
   *)
-    PRECOMMIT_YAML=""
+    case "$STACK" in
+      nextjs|nestjs|express|node)
+        PRECOMMIT_YAML="$TEMPLATE_DIR/js/.pre-commit-config.yaml"
+        ;;
+      django|fastapi|flask)
+        PRECOMMIT_YAML="$TEMPLATE_DIR/django/.pre-commit-config.yaml"
+        ;;
+      *)
+        PRECOMMIT_YAML=""
+        ;;
+    esac
     ;;
 esac
 
@@ -170,7 +197,7 @@ EXISTING_MODELS=$(find "$TARGET_DIR" -name "models.py" \
   ! -path "*/.git/*" \
   2>/dev/null | head -1)
 
-if [ -n "$EXISTING_MODELS" ]; then
+if [ "$ENV_TYPE" != "js" ] && [ -n "$EXISTING_MODELS" ]; then
   info "기존 Django 앱 감지 — DOMAIN.md 스켈레톤 생성 중..."
   bash "$SCRIPT_DIR/scripts/domain-init.sh" "$TARGET_DIR"
 fi

@@ -92,6 +92,35 @@ instance.prop_name = val
 | Repositories | 실제 쿼리 결과 | mock 없음 (SQLite 메모리 DB) |
 | Serializers | 직렬화/역직렬화 결과 | mock 없음 |
 
+
+## 도메인 지식 (DOMAIN.md)
+
+프로젝트 루트의 `DOMAIN.md`와 각 앱의 `{app}/DOMAIN.md`는 **AI 에이전트가 코드를 작성하기 전에 반드시 참조**해야 하는 도메인 지식 문서입니다.
+
+### 에이전트별 의무
+
+| 에이전트 | 의무 |
+|---------|------|
+| **analyst** | 분석 시작 전 관련 앱 `DOMAIN.md` 필수 참조 (모델 계층·용어·내부 슬랭 파악) |
+| **coder** | 코드 변경 완료 후 해당 앱 `DOMAIN.md` 변경 이력 갱신. 새 모델·필드·choices 추가 시 해당 섹션도 갱신 |
+| **reviewer** | DOMAIN.md 변경 이력이 이번 작업을 반영하는지 검증. 누락 시 coder에게 보완 요청 |
+
+### 업데이트 규칙
+
+```
+코드 변경 → {app}/DOMAIN.md 변경 이력 테이블에 한 줄 추가
+새 모델 추가 → 도메인 계층 구조 + 핵심 모델 섹션 갱신
+새 choices/status 추가 → 상태 코드 섹션 갱신
+신규 앱 추가 → 루트 DOMAIN.md 인덱스 테이블에 행 추가
+```
+
+### DOMAIN.md가 없는 경우
+
+```bash
+# 기존 프로젝트: 자동 스켈레톤 생성
+bash ~/harness-init/scripts/domain-init.sh
+```
+
 ## 하네스 (에이전트 팀)
 
 이 프로젝트에는 Django 백엔드 전용 5인 에이전트 팀이 구성되어 있다. 기능 개발, 유지보수 작업 시 이 팀을 호출한다.

@@ -102,6 +102,22 @@ if [ "$STACK" != "django" ]; then
   bash "$SCRIPT_DIR/scripts/migration.sh" "$TARGET_DIR"
 fi
 
+# ── 기존 프로젝트이면 DOMAIN.md 스켈레톤 생성 ──────────
+# models.py 가 마이그레이션 외에 존재하면 기개발 프로젝트로 판단
+EXISTING_MODELS=$(find "$TARGET_DIR" -name "models.py" \
+  ! -path "*/migrations/*" \
+  ! -path "*/.venv/*" \
+  ! -path "*/venv/*" \
+  ! -path "*/env/*" \
+  ! -path "*/__pycache__/*" \
+  ! -path "*/.git/*" \
+  2>/dev/null | head -1)
+
+if [ -n "$EXISTING_MODELS" ]; then
+  info "기존 Django 앱 감지 — DOMAIN.md 스켈레톤 생성 중..."
+  bash "$SCRIPT_DIR/scripts/domain-init.sh" "$TARGET_DIR"
+fi
+
 # ── 완료 메시지 ────────────────────────────────────────
 echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -119,7 +135,12 @@ echo "  ├── .claude/commands/        (/review 슬래시 커맨드)"
 echo "  ├── .claude/settings.json"
 echo "  ├── .gemini/                 (Gemini Code Assist 설정)"
 echo "  ├── .github/                 (이슈 템플릿, PR 템플릿, 워크플로우)"
-echo "  └── docs/DOC-SYNC-POLICY.md  (문서 동기화 정책)"
+echo "  ├── docs/DOC-SYNC-POLICY.md  (문서 동기화 정책)"
+  if [ -n "$EXISTING_MODELS" ]; then
+    echo "  └── DOMAIN.md + 앱별 DOMAIN.md  (기존 프로젝트 — TODO 항목 채우기 필요)"
+  else
+    echo "  └── (DOMAIN.md: 신규 프로젝트 — 앱 개발 후 domain-init.sh 실행)"
+  fi
 echo ""
 echo "  에이전트 팀 (orchestrator 스킬):"
 echo "  analyst → architect → coder ⇄ tester → reviewer"

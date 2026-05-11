@@ -4,6 +4,28 @@
 
 ---
 
+## 0. 문서 카테고리 및 네이밍 규칙
+
+`docs/` 디렉토리는 아래 카테고리로 관리한다. 문서를 생성하면 반드시 `CLAUDE.md`의 `## 참고 문서` 테이블에 등록한다.
+
+| 카테고리 | 파일명 패턴 | 생성 주체 | 생성 시점 |
+|---------|-----------|---------|---------|
+| 아키텍처 가이드 | `{feature}-architecture.md` | architect 에이전트 | 새 레이어 구조·패턴 확정 시 |
+| 비즈니스 정책 | `{domain}-policy.md` | architect 에이전트 | 복잡한 비즈니스 규칙이 코드에 반영될 때 |
+| 성능 분석 | `{feature}-performance-analysis.md` | architect 에이전트 | 레이턴시·병목 분석 완료 시 |
+| 배포 가이드 | `{env}-deployment.md` | DevOps 담당자 | 배포 방식 변경 시 |
+| 트러블슈팅 | `{issue}-fix-plan.md` | 장애 대응자 | 장애 원인·해결책 정리 후 |
+| API 명세 | `api/{app}.md` | 자동화 (post-merge-docs.yml) | 엔드포인트 추가·변경 시 |
+| 문서 정책 | `DOC-SYNC-POLICY.md` | 팀 합의 | 정책 변경 시 |
+
+### 네이밍 규칙
+
+- 영문 소문자 + 하이픈(kebab-case): `match-validation-policy.md`
+- 날짜가 의미 있는 분석 문서는 날짜 포함: `api-latency-analysis-2026-01.md`
+- 한국어 파일명 허용 (팀 내부 문서): `매니저-정산-정책.md`
+
+---
+
 ## 1. 원칙
 
 - **코드가 진실의 원천(source of truth)**: 문서는 코드를 반영해야 하며, 코드와 충돌 시 코드가 우선

@@ -95,6 +95,8 @@ my-project/
 │   │   ├── review.md                ← /review 슬래시 커맨드
 │   │   └── workflows/
 │   │       └── gemini-review.md     ← /workflows:gemini-review
+│   ├── hooks/
+│   │   └── domain-update-reminder.sh  ← models.py/services.py 변경 시 DOMAIN.md 업데이트 알림
 │   ├── decisions/
 │   │   └── adr-template.md
 │   └── settings.json
@@ -111,6 +113,18 @@ my-project/
 └── docs/
     └── DOC-SYNC-POLICY.md
 ```
+
+---
+
+## Hooks — 자동 알림
+
+`init.sh` 설치 시 `.claude/hooks/`와 `settings.json`에 PostToolUse 훅이 구성됩니다.
+
+| 훅 파일 | 트리거 | 동작 |
+|--------|--------|------|
+| `domain-update-reminder.sh` | Edit / Write 후 | `models.py` 변경 시 DOMAIN.md 갱신 체크리스트 출력, `services.py`/`views.py` 변경 시 흐름 업데이트 권고 |
+
+훅은 `git diff --name-only HEAD`로 변경 파일을 감지합니다. 프로젝트별 훅을 추가하려면 `.claude/hooks/`에 `.sh` 파일을 추가하고 `settings.json`의 `hooks` 섹션에 등록하세요.
 
 ---
 
@@ -197,6 +211,7 @@ harness-init/
 │       │   ├── agents/           ← analyst/architect/coder/tester/reviewer
 │       │   ├── skills/           ← orchestrator + 5개 단독 스킬
 │       │   ├── commands/
+│       │   ├── hooks/            ← domain-update-reminder.sh
 │       │   └── decisions/
 │       ├── .gemini/
 │       ├── .github/

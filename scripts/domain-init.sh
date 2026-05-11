@@ -18,7 +18,7 @@ warn()    { echo -e "${YELLOW}[domain-init]${NC} ⚠ $1"; }
 
 # ── 상대 경로 (macOS/Linux 공용) ───────────────────────
 rel_path() {
-  python3 -c "import os; print(os.path.relpath('$1', '$TARGET_DIR'))"
+  python3 -c "import os, sys; print(os.path.relpath(sys.argv[1], sys.argv[2]))" "$1" "$TARGET_DIR"
 }
 
 # ── Django 앱 디렉토리 탐지 ─────────────────────────────
@@ -32,8 +32,8 @@ find_django_apps() {
     ! -path "*/__pycache__/*" \
     ! -path "*/.git/*" \
     ! -path "*/.worktrees/*" \
-    2>/dev/null \
-  | xargs -I{} dirname {} \
+    -print0 2>/dev/null \
+  | xargs -0 -n1 dirname \
   | sort -u
 }
 
@@ -41,8 +41,8 @@ find_django_apps() {
 extract_models() {
   local models_file="$1/models.py"
   [ -f "$models_file" ] || return
-  grep -E "^class [A-Z][A-Za-z]+" "$models_file" \
-    | sed 's/class \([A-Za-z]*\).*/\1/' \
+  grep -E "^class [A-Z][A-Za-z0-9_]+" "$models_file" \
+    | sed 's/class \([A-Za-z0-9_]*\).*/\1/' \
     | head -20
 }
 

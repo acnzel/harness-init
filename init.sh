@@ -20,21 +20,27 @@ success() { echo -e "${GREEN}[harness]${NC} ✓ $1"; }
 warn()    { echo -e "${YELLOW}[harness]${NC} $1"; }
 
 # ── 환경 선택 ──────────────────────────────────────────
-echo ""
-echo -e "${BLUE}  어떤 환경으로 구축 예정이신가요?${NC}"
-echo "  1) Python  (Django / FastAPI / Flask)"
-echo "  2) JS / TS (Next.js / NestJS / Express)"
-echo "  3) 모름    (자동 감지)"
-echo ""
-printf "  선택 [1-3]: "
-read -r ENV_CHOICE
+if [ -z "$ENV_TYPE" ]; then
+  if [ -t 0 ]; then
+    echo ""
+    echo -e "${BLUE}  어떤 환경으로 구축 예정이신가요?${NC}"
+    echo "  1) Python  (Django / FastAPI / Flask)"
+    echo "  2) JS / TS (Next.js / NestJS / Express)"
+    echo "  3) 모름    (자동 감지)"
+    echo ""
+    printf "  선택 [1-3]: "
+    read -r ENV_CHOICE || ENV_CHOICE="3"
 
-case "$ENV_CHOICE" in
-  1) ENV_TYPE="python" ;;
-  2) ENV_TYPE="js"     ;;
-  *) ENV_TYPE="auto"   ;;
-esac
-echo ""
+    case "$ENV_CHOICE" in
+      1) ENV_TYPE="python" ;;
+      2) ENV_TYPE="js"     ;;
+      *) ENV_TYPE="auto"   ;;
+    esac
+    echo ""
+  else
+    ENV_TYPE="auto"
+  fi
+fi
 
 # ── 스택 감지 ──────────────────────────────────────────
 STACK=$(bash "$SCRIPT_DIR/scripts/migration.sh" --detect "$TARGET_DIR")

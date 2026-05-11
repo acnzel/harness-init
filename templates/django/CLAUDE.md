@@ -128,6 +128,7 @@ bash ~/harness-init/scripts/domain-init.sh
 | 훅 | 트리거 | 동작 |
 |----|--------|------|
 | `domain-update-reminder.sh` | Edit / Write 후 | `models.py` 변경 → DOMAIN.md 갱신 체크리스트 출력<br>`services.py`/`views.py` 변경 → 흐름 업데이트 권고 |
+| `insight-collector.sh` | Bash / Edit / Write 후 | Claude 응답의 `★ Insight` 블록을 감지해 `.claude/insights.md`에 자동 저장 |
 
 훅은 프로젝트 루트에서 실행되며 `git diff --name-only HEAD`로 변경 파일을 감지합니다.
 추가 훅은 `.claude/hooks/*.sh` 로 추가하고 `settings.json`의 `hooks` 섹션에 등록하세요.

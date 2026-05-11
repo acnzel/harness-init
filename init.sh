@@ -111,7 +111,8 @@ if [ -d "$TEMPLATE_DIR/django/docs" ]; then
 fi
 
 # DOMAIN.md 복사 (JS: 정적 템플릿 / Python: domain-init.sh가 동적 생성)
-if [ "$ENV_TYPE" = "js" ]; then
+IS_JS_ENV() { [ "$ENV_TYPE" = "js" ] || { [ "$ENV_TYPE" = "auto" ] && [[ "$STACK" =~ ^(nextjs|nestjs|express|node)$ ]]; }; }
+if IS_JS_ENV; then
   if [ ! -f "$TARGET_DIR/DOMAIN.md" ]; then
     cp "$TEMPLATE_DIR/js/DOMAIN.md" "$TARGET_DIR/DOMAIN.md"
     success "DOMAIN.md 템플릿 생성 완료 (JS용 — TODO 항목 채우기 필요)"
@@ -213,7 +214,7 @@ EXISTING_MODELS=$(find "$TARGET_DIR" -name "models.py" \
   ! -path "*/.git/*" \
   2>/dev/null | head -1)
 
-if [ "$ENV_TYPE" != "js" ] && [ -n "$EXISTING_MODELS" ]; then
+if ! IS_JS_ENV && [ -n "$EXISTING_MODELS" ]; then
   info "기존 Django 앱 감지 — DOMAIN.md 스켈레톤 생성 중..."
   bash "$SCRIPT_DIR/scripts/domain-init.sh" "$TARGET_DIR"
 fi
@@ -238,7 +239,7 @@ echo "  ├── .claude/settings.json"
 echo "  ├── .gemini/                 (Gemini Code Assist 설정)"
 echo "  ├── .github/                 (이슈 템플릿, PR 템플릿, 워크플로우)"
 echo "  ├── docs/DOC-SYNC-POLICY.md  (문서 동기화 정책)"
-  if [ "$ENV_TYPE" = "js" ]; then
+  if IS_JS_ENV; then
     echo "  └── DOMAIN.md  (JS 템플릿 — TODO 항목 채우기 필요)"
   elif [ -n "$EXISTING_MODELS" ]; then
     echo "  └── DOMAIN.md + 앱별 DOMAIN.md  (기존 Django 프로젝트 — TODO 항목 채우기 필요)"
@@ -256,7 +257,7 @@ echo "  GitHub Actions:"
 echo "  claude-code-review · claude · pr-auto-fill · pr-test · post-merge-docs"
 echo ""
 
-if [ "$ENV_TYPE" = "js" ]; then
+if IS_JS_ENV; then
   echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
   echo -e "${YELLOW}  📝 DOMAIN.md 작성 가이드 (JS/TS 환경)${NC}"
   echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"

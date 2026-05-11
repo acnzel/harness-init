@@ -50,6 +50,14 @@ success "agents 설치 완료"
 cp -rn "$TEMPLATE_DIR/django/.claude/commands/"* "$TARGET_DIR/.claude/commands/" 2>/dev/null || true
 success "commands 설치 완료"
 
+# hooks 복사
+if [ -d "$TEMPLATE_DIR/django/.claude/hooks" ]; then
+  mkdir -p "$TARGET_DIR/.claude/hooks"
+  cp -rn "$TEMPLATE_DIR/django/.claude/hooks/"* "$TARGET_DIR/.claude/hooks/" 2>/dev/null || true
+  chmod +x "$TARGET_DIR/.claude/hooks/"*.sh 2>/dev/null || true
+  success "hooks 설치 완료"
+fi
+
 # settings.json (없을 때만 생성)
 if [ ! -f "$TARGET_DIR/.claude/settings.json" ]; then
   cp "$TEMPLATE_DIR/django/.claude/settings.json" "$TARGET_DIR/.claude/settings.json"
@@ -132,6 +140,7 @@ echo "  ├── .claude/decisions/"
 echo "  ├── .claude/skills/          (explore/implement/debug/review/autopilot + orchestrator)"
 echo "  ├── .claude/agents/          (analyst/architect/coder/tester/reviewer)"
 echo "  ├── .claude/commands/        (/review, /workflows:gemini-review 슬래시 커맨드)"
+echo "  ├── .claude/hooks/           (domain-update-reminder.sh — Edit/Write PostToolUse)"
 echo "  ├── .claude/settings.json"
 echo "  ├── .gemini/                 (Gemini Code Assist 설정)"
 echo "  ├── .github/                 (이슈 템플릿, PR 템플릿, 워크플로우)"

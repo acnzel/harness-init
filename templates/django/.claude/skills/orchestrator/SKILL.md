@@ -46,11 +46,16 @@ django 백엔드의 **기능 개발/유지보수 작업을 전담하는 5인 전
 TeamCreate(
   team_name: "django-backend-team",
   members: [
-    { name: "analyst", agent_type: "analyst", model: "opus" },
-    { name: "architect", agent_type: "architect", model: "opus" },
-    { name: "coder", agent_type: "coder", model: "opus" },
-    { name: "tester", agent_type: "tester", model: "opus" },
-    { name: "reviewer", agent_type: "reviewer", model: "opus" }
+    { name: "analyst", agent_type: "analyst", model: "opus",
+      prompt: "_workspace/00_input.md를 읽고 영향 범위·모델 선행 분석을 _workspace/01_ticket_analysis.md에 작성. 관련 앱 DOMAIN.md 필수 선행 참조. 완료 시 architect에게 SendMessage." },
+    { name: "architect", agent_type: "architect", model: "opus",
+      prompt: "_workspace/01_ticket_analysis.md를 기반으로 Views/Services/Repositories 설계·테스트 전략을 _workspace/02_architecture.md에 작성. 완료 시 coder에게 SendMessage." },
+    { name: "coder", agent_type: "coder", model: "opus",
+      prompt: "_workspace/02_architecture.md를 따라 코드 작성. 모델 변경 필요 시 즉시 중단 후 리더에게 보고. 구현 완료 후 해당 앱 DOMAIN.md 변경 이력 갱신. 결과를 _workspace/03_implementation_notes.md에 작성. 완료 시 tester에게 SendMessage." },
+    { name: "tester", agent_type: "tester", model: "opus",
+      prompt: "_workspace/02_architecture.md 테스트 전략과 _workspace/03_implementation_notes.md 변경 파일 목록을 기반으로 pytest 작성(Factory + PropertyMock). 결과를 _workspace/04_test_notes.md에 작성. 완료 시 reviewer에게 SendMessage." },
+    { name: "reviewer", agent_type: "reviewer", model: "opus",
+      prompt: "구현+테스트 완료 변경을 CLAUDE.md 규칙·레이어 경계·DOMAIN.md 체크리스트 E 기준으로 리뷰. _workspace/05_review_report.md 작성. FAIL 시 담당 에이전트에게 SendMessage로 재작업 요청." }
   ]
 )
 ```

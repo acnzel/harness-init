@@ -121,6 +121,33 @@ instance.prop_name = val
 bash ~/harness-init/scripts/domain-init.sh
 ```
 
+## Hooks — 자동 알림
+
+`settings.json`의 PostToolUse 훅이 Edit/Write 직후 자동으로 실행됩니다.
+
+| 훅 | 트리거 | 동작 |
+|----|--------|------|
+| `domain-update-reminder.sh` | Edit / Write 후 | `models.py` 변경 → DOMAIN.md 갱신 체크리스트 출력<br>`services.py`/`views.py` 변경 → 흐름 업데이트 권고 |
+
+훅은 프로젝트 루트에서 실행되며 `git diff --name-only HEAD`로 변경 파일을 감지합니다.
+추가 훅은 `.claude/hooks/*.sh` 로 추가하고 `settings.json`의 `hooks` 섹션에 등록하세요.
+
+## _workspace/ — 에이전트 산출물 디렉토리
+
+오케스트레이터 실행 시 에이전트 간 인수인계 파일이 `_workspace/`에 저장됩니다.
+
+| 파일 | 생성 에이전트 | 내용 |
+|------|-------------|------|
+| `_workspace/00_input.md` | orchestrator | 티켓 원문 또는 사용자 입력 |
+| `_workspace/01_ticket_analysis.md` | analyst | 영향 범위·모델 분석·제약사항 |
+| `_workspace/02_architecture.md` | architect | 레이어드 설계·테스트 전략 |
+| `_workspace/03_implementation_notes.md` | coder | 구현 완료 파일 목록·결정 사항 |
+| `_workspace/04_test_notes.md` | tester | 테스트 파일 목록·실행 결과 |
+| `_workspace/05_review_report.md` | reviewer | 리뷰 결과·위반 목록 |
+
+`_workspace/`는 `.gitignore`에 추가하거나 작업 단위로 관리합니다.
+새 티켓 실행 시 기존 `_workspace/`는 `_workspace_{YYYYMMDD_HHMMSS}/`로 자동 이동됩니다.
+
 ## 하네스 (에이전트 팀)
 
 이 프로젝트에는 Django 백엔드 전용 5인 에이전트 팀이 구성되어 있다. 기능 개발, 유지보수 작업 시 이 팀을 호출한다.

@@ -92,7 +92,9 @@ my-project/
 │   │   ├── review.md                ← /review
 │   │   └── autopilot.md             ← /autopilot
 │   ├── commands/
-│   │   └── review.md                ← /review 슬래시 커맨드
+│   │   ├── review.md                ← /review 슬래시 커맨드
+│   │   └── workflows/
+│   │       └── gemini-review.md     ← /workflows:gemini-review
 │   ├── decisions/
 │   │   └── adr-template.md
 │   └── settings.json

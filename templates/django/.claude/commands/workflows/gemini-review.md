@@ -37,7 +37,7 @@ Get all review comments from Gemini Code Assist:
 PR_NUMBER=$(gh pr view --json number -q '.number')
 
 # Get all review comments
-gh api repos/{owner}/{repo}/pulls/$PR_NUMBER/comments
+gh api repos/:owner/:repo/pulls/$PR_NUMBER/comments
 ```
 
 Filter comments where `user.login` contains "gemini" or "google" (Gemini Code Assist bot).
@@ -97,7 +97,7 @@ After all approved changes are applied:
 ```bash
 git add -A
 # Use the Jira ticket ID from PR title (e.g., [DEV-2500])
-git commit -m "[{TICKET_ID}] fix: apply Gemini code review feedback
+git commit -m "[${TICKET}] fix: apply Gemini code review feedback
 
 Applied:
 - {list of applied changes}
@@ -105,7 +105,7 @@ Applied:
 Skipped (over-engineering):
 - {list of skipped changes with reasons}
 
-Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 
 git push
 ```
@@ -121,7 +121,7 @@ For each processed comment, **반드시** GitHub API로 답변을 남긴다. **�
 
 **For applied changes:**
 ```bash
-gh api repos/{owner}/{repo}/pulls/$PR_NUMBER/comments/$COMMENT_ID/replies \
+gh api repos/:owner/:repo/pulls/$PR_NUMBER/comments/$COMMENT_ID/replies \
   -f body="@gemini-code-assist ✅ Fixed in ${COMMIT_SHA:0:7}
 
 {구체적으로 어떻게 수정했는지 간단히 설명}"
@@ -129,7 +129,7 @@ gh api repos/{owner}/{repo}/pulls/$PR_NUMBER/comments/$COMMENT_ID/replies \
 
 **For skipped changes (KISS/YAGNI 근거 명시):**
 ```bash
-gh api repos/{owner}/{repo}/pulls/$PR_NUMBER/comments/$COMMENT_ID/replies \
+gh api repos/:owner/:repo/pulls/$PR_NUMBER/comments/$COMMENT_ID/replies \
   -f body="@gemini-code-assist ⏭️ Skipped
 
 {KISS/YAGNI/DRY 중 해당 원칙}: {구체적 사유}"
@@ -137,7 +137,7 @@ gh api repos/{owner}/{repo}/pulls/$PR_NUMBER/comments/$COMMENT_ID/replies \
 
 **For DRY fixes (중복 제거):**
 ```bash
-gh api repos/{owner}/{repo}/pulls/$PR_NUMBER/comments/$COMMENT_ID/replies \
+gh api repos/:owner/:repo/pulls/$PR_NUMBER/comments/$COMMENT_ID/replies \
   -f body="@gemini-code-assist ✅ Fixed in ${COMMIT_SHA:0:7}
 
 DRY: {어떤 중복을 어떻게 제거했는지 설명}"

@@ -105,8 +105,20 @@ else
 fi
 
 # ── pre-commit 설정 ────────────────────────────────────
-PRECOMMIT_YAML="$TEMPLATE_DIR/django/.pre-commit-config.yaml"
-if [ -f "$PRECOMMIT_YAML" ]; then
+# 스택별 적합한 yaml 선택 (java/spring 계열은 생략)
+case "$STACK" in
+  nextjs|nestjs|express|node)
+    PRECOMMIT_YAML="$TEMPLATE_DIR/js/.pre-commit-config.yaml"
+    ;;
+  django|fastapi|flask)
+    PRECOMMIT_YAML="$TEMPLATE_DIR/django/.pre-commit-config.yaml"
+    ;;
+  *)
+    PRECOMMIT_YAML=""
+    ;;
+esac
+
+if [ -n "$PRECOMMIT_YAML" ] && [ -f "$PRECOMMIT_YAML" ]; then
   if [ ! -f "$TARGET_DIR/.pre-commit-config.yaml" ]; then
     cp "$PRECOMMIT_YAML" "$TARGET_DIR/.pre-commit-config.yaml"
     success ".pre-commit-config.yaml 생성 완료"
@@ -172,7 +184,7 @@ echo ""
 echo "  생성된 파일:"
 echo "  ├── CLAUDE.md"
 echo "  ├── .gitignore"
-echo "  ├── .pre-commit-config.yaml   (pre-commit-hooks + ruff)"
+echo "  ├── .pre-commit-config.yaml   (python: ruff / js: prettier+eslint)"
 echo "  ├── .claude/tasks/"
 echo "  ├── .claude/decisions/"
 echo "  ├── .claude/skills/          (explore/implement/debug/review/autopilot + orchestrator)"

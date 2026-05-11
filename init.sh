@@ -114,15 +114,20 @@ if [ -f "$PRECOMMIT_YAML" ]; then
     warn ".pre-commit-config.yaml 이미 존재, 건너뜀"
   fi
 
-  # pre-commit 설치 확인 및 자동 설치
+  # pre-commit 설치 확인 및 자동 설치 (brew → pipx → pip 순으로 시도)
   if ! command -v pre-commit &>/dev/null; then
-    info "pre-commit 미설치 — pip으로 설치 중..."
-    if command -v pip &>/dev/null; then
-      pip install pre-commit -q
+    info "pre-commit 미설치 — 설치 시도 중..."
+    if command -v brew &>/dev/null; then
+      brew install pre-commit -q && success "pre-commit 설치 완료 (brew)"
+    elif command -v pipx &>/dev/null; then
+      pipx install pre-commit && success "pre-commit 설치 완료 (pipx)"
+    elif command -v pip &>/dev/null; then
+      pip install pre-commit -q && success "pre-commit 설치 완료 (pip)"
     elif command -v pip3 &>/dev/null; then
-      pip3 install pre-commit -q
+      pip3 install pre-commit -q && success "pre-commit 설치 완료 (pip3)"
     else
-      warn "pip을 찾을 수 없습니다. 수동으로 'pip install pre-commit' 후 'pre-commit install' 실행 필요"
+      warn "pre-commit 자동 설치 실패. 수동으로 설치 후 'pre-commit install' 실행하세요:"
+      warn "  brew install pre-commit  또는  pipx install pre-commit"
     fi
   fi
 

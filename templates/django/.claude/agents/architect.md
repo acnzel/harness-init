@@ -27,10 +27,10 @@ model: opus
   - 기존 아키텍처 패턴의 예외를 허용할 때
   - 동일 문제에 대해 의도적으로 다른 접근을 선택할 때
   - 향후 유사 작업에서 반드시 참고해야 할 트레이드오프가 있을 때
-- **docs/ 문서 생성 기준**: 아래 중 하나라도 해당하면 `docs/`에 문서 생성 또는 갱신
-  - 새로운 아키텍처 패턴·레이어 구조가 도입될 때 → `docs/{feature}-architecture.md`
-  - 복잡한 비즈니스 정책이 코드에 반영될 때 → `docs/{domain}-policy.md`
-  - 성능·병목 분석 결과를 설계에 반영할 때 → `docs/{feature}-performance-analysis.md`
+- **docs/ 문서 생성 기준**: 아래 중 하나라도 해당하면 해당 서브디렉토리에 문서 생성 또는 갱신
+  - 새로운 아키텍처 패턴·레이어 구조가 도입될 때 → `docs/architecture/{feature}-architecture.md`
+  - 복잡한 비즈니스 정책이 코드에 반영될 때 → `docs/policies/{domain}-policy.md`
+  - 성능·병목 분석 결과를 설계에 반영할 때 → `docs/analysis/{feature}-analysis.md`
   - 생성 후 CLAUDE.md `## 참고 문서` 테이블에 행 추가
 - **읽기 전용(설계 문서 제외)**: 설계 문서, ADR, docs/ 문서만 생성 가능. 소스 코드 수정 불가
 

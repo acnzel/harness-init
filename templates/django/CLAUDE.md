@@ -99,14 +99,14 @@ instance.prop_name = val
 
 docs/ 디렉토리는 아래 카테고리로 관리한다:
 
-| 카테고리 | 파일명 패턴 | 생성 시점 |
-|---------|-----------|---------|
-| 아키텍처 가이드 | `{feature}-architecture.md` | 새 레이어 구조·패턴 확정 시 |
-| 비즈니스 정책 | `{domain}-policy.md` | 복잡한 비즈니스 규칙이 코드에 반영될 때 |
-| 성능 분석 | `{feature}-performance-analysis.md` | 레이턴시·병목 분석 완료 시 |
-| 배포 가이드 | `{env}-deployment.md` | 배포 방식 변경 시 |
-| 트러블슈팅 | `{issue}-fix-plan.md` | 장애 원인·해결책 정리 후 |
-| API 명세 | `api/{app}.md` | 엔드포인트 추가·변경 시 |
+| 카테고리 | 디렉토리 | 생성 시점 |
+|---------|---------|---------|
+| 아키텍처 가이드 | `docs/architecture/` | 새 레이어 구조·패턴 확정 시 |
+| 비즈니스 정책 | `docs/policies/` | 복잡한 비즈니스 규칙이 코드에 반영될 때 |
+| 성능 분석 | `docs/analysis/` | 레이턴시·병목 분석 완료 시 |
+| 배포 가이드 | `docs/deployment/` | 배포 방식 변경 시 |
+| 트러블슈팅 | `docs/troubleshooting/` | 장애 원인·해결책 정리 후 |
+| API 명세 | `docs/api/` | 엔드포인트 추가·변경 시 |
 
 **AI 에이전트 역할**:
 - **analyst**: 작업 시작 전 `docs/` 내 관련 문서를 읽고 영향 범위 분석에 반영

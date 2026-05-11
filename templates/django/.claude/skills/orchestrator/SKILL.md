@@ -61,7 +61,7 @@ TeamCreate(
 TaskCreate(tasks: [
   { title: "티켓 분석 및 영향 범위 식별", assignee: "analyst" },
   { title: "레이어드 설계 문서 작성", assignee: "architect" },
-  { title: "Views/Services/Repositories 구현", assignee: "coder" },
+  { title: "Views/Services/Repositories 구현 + 해당 앱 DOMAIN.md 업데이트", assignee: "coder" },
   { title: "pytest 테스트 작성 및 실행", assignee: "tester" },
   { title: "레이어 규칙 및 CLAUDE.md 준수 리뷰", assignee: "reviewer" }
 ])
@@ -73,7 +73,8 @@ TaskCreate(tasks: [
 1. analyst → SendMessage(to: architect)
 2. architect → SendMessage(to: coder)
 3. coder ↔ tester (양방향 생성-검증 루프, 최대 3회)
-4. reviewer → PASS 시 리더에게 "PR 제출 가능" 보고
+   - **루프 완료 직후**: coder가 변경된 앱의 `DOMAIN.md` 변경 이력 업데이트 여부 자체 확인
+4. reviewer → DOMAIN.md 체크리스트 E 포함하여 검증 → PASS 시 리더에게 "PR 제출 가능" 보고
 
 **리뷰 게이트**:
 - FAIL 시: 담당 에이전트에게 SendMessage로 재작업 요청. 최대 2회 루프
@@ -157,6 +158,8 @@ TaskCreate(tasks: [
 - **리뷰**: PASS / FAIL (위반 N건)
 
 ## 변경 파일 목록
+## DOMAIN.md 업데이트
+- (변경된 앱 + 업데이트 내용, 없으면 "없음")
 ## PR
 - **브랜치**: feature/{TICKET-ID} → dev
 - **PR URL**: (자동 생성된 PR 링크)

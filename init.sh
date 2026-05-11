@@ -104,38 +104,6 @@ else
   success ".gitignore 생성 완료"
 fi
 
-# ── pre-commit 설정 ────────────────────────────────────
-PRECOMMIT_YAML="$TEMPLATE_DIR/django/.pre-commit-config.yaml"
-if [ -f "$PRECOMMIT_YAML" ]; then
-  if [ ! -f "$TARGET_DIR/.pre-commit-config.yaml" ]; then
-    cp "$PRECOMMIT_YAML" "$TARGET_DIR/.pre-commit-config.yaml"
-    success ".pre-commit-config.yaml 생성 완료"
-  else
-    warn ".pre-commit-config.yaml 이미 존재, 건너뜀"
-  fi
-
-  # pre-commit 설치 확인 및 자동 설치
-  if ! command -v pre-commit &>/dev/null; then
-    info "pre-commit 미설치 — pip으로 설치 중..."
-    if command -v pip &>/dev/null; then
-      pip install pre-commit -q
-    elif command -v pip3 &>/dev/null; then
-      pip3 install pre-commit -q
-    else
-      warn "pip을 찾을 수 없습니다. 수동으로 'pip install pre-commit' 후 'pre-commit install' 실행 필요"
-    fi
-  fi
-
-  # git 저장소이면 훅 등록 (pre-commit 설치 확인 후 실행)
-  if git -C "$TARGET_DIR" rev-parse --git-dir &>/dev/null; then
-    if command -v pre-commit &>/dev/null; then
-      (cd "$TARGET_DIR" && pre-commit install) && success "pre-commit 훅 등록 완료"
-    fi
-  else
-    warn "git 저장소가 아닙니다. 'git init' 후 'pre-commit install' 수동 실행 필요"
-  fi
-fi
-
 # ── 비 Django 스택이면 harness 마이그레이션 ───────────
 if [ "$STACK" != "django" ]; then
   info "비 Django 스택 감지 — harness 마이그레이션 실행..."
@@ -167,7 +135,6 @@ echo ""
 echo "  생성된 파일:"
 echo "  ├── CLAUDE.md"
 echo "  ├── .gitignore"
-echo "  ├── .pre-commit-config.yaml   (pre-commit-hooks + ruff)"
 echo "  ├── .claude/tasks/"
 echo "  ├── .claude/decisions/"
 echo "  ├── .claude/skills/          (explore/implement/debug/review/autopilot + orchestrator)"

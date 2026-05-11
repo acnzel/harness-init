@@ -104,6 +104,16 @@ if [ -d "$TEMPLATE_DIR/django/docs" ]; then
   success "docs 설치 완료"
 fi
 
+# DOMAIN.md 복사 (JS: 정적 템플릿 / Python: domain-init.sh가 동적 생성)
+if [ "$ENV_TYPE" = "js" ]; then
+  if [ ! -f "$TARGET_DIR/DOMAIN.md" ]; then
+    cp "$TEMPLATE_DIR/js/DOMAIN.md" "$TARGET_DIR/DOMAIN.md"
+    success "DOMAIN.md 템플릿 생성 완료 (JS용 — TODO 항목 채우기 필요)"
+  else
+    warn "DOMAIN.md 이미 존재, 건너뜀"
+  fi
+fi
+
 # ── .gitignore 업데이트 ────────────────────────────────
 GITIGNORE="$TARGET_DIR/.gitignore"
 APPEND_FILE="$TEMPLATE_DIR/django/.gitignore.append"
@@ -222,8 +232,10 @@ echo "  ├── .claude/settings.json"
 echo "  ├── .gemini/                 (Gemini Code Assist 설정)"
 echo "  ├── .github/                 (이슈 템플릿, PR 템플릿, 워크플로우)"
 echo "  ├── docs/DOC-SYNC-POLICY.md  (문서 동기화 정책)"
-  if [ -n "$EXISTING_MODELS" ]; then
-    echo "  └── DOMAIN.md + 앱별 DOMAIN.md  (기존 프로젝트 — TODO 항목 채우기 필요)"
+  if [ "$ENV_TYPE" = "js" ]; then
+    echo "  └── DOMAIN.md  (JS 템플릿 — TODO 항목 채우기 필요)"
+  elif [ -n "$EXISTING_MODELS" ]; then
+    echo "  └── DOMAIN.md + 앱별 DOMAIN.md  (기존 Django 프로젝트 — TODO 항목 채우기 필요)"
   else
     echo "  └── (DOMAIN.md: 신규 프로젝트 — 앱 개발 후 domain-init.sh 실행)"
   fi

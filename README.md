@@ -94,10 +94,12 @@ my-project/
 │   │   └── autopilot.md             ← /autopilot
 │   ├── commands/
 │   │   ├── review.md                ← /review 슬래시 커맨드
+│   │   ├── learn.md                 ← /learn (insight → 스킬 저장)
 │   │   └── workflows/
 │   │       └── gemini-review.md     ← /workflows:gemini-review
 │   ├── hooks/
-│   │   └── domain-update-reminder.sh  ← models.py/services.py 변경 시 DOMAIN.md 업데이트 알림
+│   │   ├── domain-update-reminder.sh  ← models.py/services.py 변경 시 DOMAIN.md 업데이트 알림
+│   │   └── insight-collector.sh       ← ★ Insight 블록 자동 수집 → .claude/insights.md
 │   ├── decisions/
 │   │   └── adr-template.md
 │   └── settings.json
@@ -124,8 +126,30 @@ my-project/
 | 훅 파일 | 트리거 | 동작 |
 |--------|--------|------|
 | `domain-update-reminder.sh` | Edit / Write 후 | `models.py` 변경 시 DOMAIN.md 갱신 체크리스트 출력, `services.py`/`views.py` 변경 시 흐름 업데이트 권고 |
+| `insight-collector.sh` | Bash / Edit / Write 후 | Claude 응답의 `★ Insight` 블록을 감지해 `.claude/insights.md`에 자동 저장 |
 
 훅은 `git diff --name-only HEAD`로 변경 파일을 감지합니다. 프로젝트별 훅을 추가하려면 `.claude/hooks/`에 `.sh` 파일을 추가하고 `settings.json`의 `hooks` 섹션에 등록하세요.
+
+### Insight 자동 수집
+
+Claude가 작업 중 코드베이스 특화 패턴을 발견하면 다음 포맷으로 인라인 출력합니다:
+
+```
+`★ Insight ─────────────────────────────────────`
+  [발견한 원칙 또는 패턴]
+`─────────────────────────────────────────────────`
+```
+
+`insight-collector.sh` 훅이 다음 도구 호출 직후 세션 JSONL을 증분 스캔해 `.claude/insights.md`에 자동 저장합니다. 새 insight가 저장되면 터미널에 `💡 N개의 인사이트가 .claude/insights.md 에 저장됐습니다.` 알림이 출력됩니다.
+
+insight를 수동으로 스킬로 승격하려면 `/learn` 슬래시 커맨드를 사용합니다:
+
+```
+/learn                        # 자동으로 스킬명 생성
+/learn django-db-table-naming # 스킬명 지정
+```
+
+결과는 `.claude/skills/{skill-name}.md`로 저장됩니다.
 
 ---
 

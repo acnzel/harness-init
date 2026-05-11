@@ -40,6 +40,10 @@
           {
             "type": "command",
             "command": ".claude/hooks/domain-update-reminder.sh"
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/insight-collector.sh"
           }
         ]
       },
@@ -49,6 +53,10 @@
           {
             "type": "command",
             "command": ".claude/hooks/domain-update-reminder.sh"
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/insight-collector.sh"
           }
         ]
       },
@@ -58,6 +66,10 @@
           {
             "type": "command",
             "command": "if echo \"$TOOL_INPUT\" | grep -q 'gh pr create'; then echo '\\n📋 PR이 생성되었습니다. /review 를 실행하여 종합 코드 리뷰를 수행하세요.'; fi"
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/insight-collector.sh"
           }
         ]
       }

@@ -203,6 +203,37 @@ if [ "$STACK" != "django" ]; then
   bash "$SCRIPT_DIR/scripts/migration.sh" "$TARGET_DIR"
 fi
 
+# ── JS 환경 전용 파일 오버라이드 ───────────────────────
+# migration.sh가 Django 기반으로 변환한 내용을 JS 전용 버전으로 덮어쓴다
+if IS_JS_ENV; then
+  info "JS/TS 환경 전용 파일 적용 중..."
+
+  # agents 오버라이드 (Django → JS/TS 레이어 패턴)
+  if [ -d "$TEMPLATE_DIR/js/.claude/agents" ]; then
+    cp -rf "$TEMPLATE_DIR/js/.claude/agents/"* "$TARGET_DIR/.claude/agents/" 2>/dev/null || true
+    success "JS agents 적용 완료"
+  fi
+
+  # hooks 오버라이드 (models.py 감지 → schema/entity 파일 감지)
+  if [ -d "$TEMPLATE_DIR/js/.claude/hooks" ]; then
+    cp -f "$TEMPLATE_DIR/js/.claude/hooks/"* "$TARGET_DIR/.claude/hooks/" 2>/dev/null || true
+    chmod +x "$TARGET_DIR/.claude/hooks/"*.sh 2>/dev/null || true
+    success "JS hooks 적용 완료"
+  fi
+
+  # GitHub Actions 오버라이드 (pytest → npm test)
+  if [ -f "$TEMPLATE_DIR/js/.github/workflows/pr-test.yml" ]; then
+    cp -f "$TEMPLATE_DIR/js/.github/workflows/pr-test.yml" "$TARGET_DIR/.github/workflows/pr-test.yml"
+    success "JS pr-test.yml 적용 완료"
+  fi
+
+  # CLAUDE.md 오버라이드 (Django 아키텍처 규칙 → JS/TS 아키텍처 규칙)
+  if [ -f "$TEMPLATE_DIR/js/CLAUDE.md" ]; then
+    cp -f "$TEMPLATE_DIR/js/CLAUDE.md" "$TARGET_DIR/CLAUDE.md"
+    success "JS CLAUDE.md 적용 완료"
+  fi
+fi
+
 # ── 기존 프로젝트이면 DOMAIN.md 스켈레톤 생성 ──────────
 # models.py 가 마이그레이션 외에 존재하면 기개발 프로젝트로 판단
 EXISTING_MODELS=$(find "$TARGET_DIR" -name "models.py" \

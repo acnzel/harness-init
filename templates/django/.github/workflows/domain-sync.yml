@@ -41,23 +41,11 @@ jobs:
         if: steps.changed.outputs.has_model_changes == 'true'
         run: npm install -g @anthropic-ai/claude-code
 
-      - name: Generate DOMAIN.md skeletons (new apps)
+      - name: Sync DOMAIN.md with Claude Code
         if: steps.changed.outputs.has_model_changes == 'true'
         run: |
-          if [ -f ".claude/scripts/domain-init.sh" ]; then
-            bash .claude/scripts/domain-init.sh .
-          else
-            echo "domain-init.sh not found — skipping skeleton generation"
-          fi
-
-      - name: Fill DOMAIN.md with Claude Code
-        if: steps.changed.outputs.has_model_changes == 'true'
-        run: |
-          if [ -f ".claude/scripts/domain-fill.sh" ]; then
-            bash .claude/scripts/domain-fill.sh .
-          else
-            echo "domain-fill.sh not found — skipping DOMAIN.md fill"
-          fi
+          GOAL="models.py가 변경된 Django 앱의 DOMAIN.md 스켈레톤이 없으면 생성하고, 해당 models.py의 실제 필드·관계·Choices로 채운 뒤, 루트 DOMAIN.md의 앱 인덱스·Quick Reference·관계 다이어그램을 업데이트할 것. 각 앱 완료 시 반드시 '✓ {앱명} DOMAIN.md 완료'를 출력할 것. 코드에 없는 내용은 절대 추가하지 말 것. or stop after 50 turns"
+          claude --dangerously-skip-permissions -p "/goal $GOAL" </dev/null
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 

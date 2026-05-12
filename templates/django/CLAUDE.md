@@ -121,6 +121,27 @@ instance.prop_name = val
 bash ~/harness-init/scripts/domain-init.sh
 ```
 
+## 참고 문서
+
+`docs/` 디렉토리는 카테고리별 서브디렉토리로 관리합니다. 에이전트가 작업 전 관련 문서를 자동 참조하고, 아키텍처·정책 결정 시 자동 생성합니다.
+
+| 디렉토리 | 용도 | 생성 주체 |
+|---------|------|---------|
+| `docs/architecture/` | 레이어 구조·패턴 가이드 | architect 에이전트 |
+| `docs/policies/` | 비즈니스 정책·규칙 | architect 에이전트 |
+| `docs/analysis/` | 성능·병목 분석 결과 | architect 에이전트 |
+| `docs/deployment/` | 배포·인프라 가이드 | DevOps 담당자 |
+| `docs/troubleshooting/` | 장애 대응·버그 수정 이력 | 장애 대응자 |
+| `docs/api/` | 엔드포인트 명세 | post-merge-docs.yml (이슈 생성 자동화) |
+
+새 문서를 생성하면 아래 **프로젝트 문서 인덱스** 테이블에 등록합니다.
+
+### 프로젝트 문서 인덱스
+
+| 문서 | 경로 | 내용 |
+|------|------|------|
+| (TODO: 아키텍처 결정 문서를 여기에 등록) | | |
+
 ## Hooks — 자동 알림
 
 `settings.json`의 PostToolUse 훅이 Edit/Write 직후 자동으로 실행됩니다.

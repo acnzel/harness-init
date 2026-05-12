@@ -101,6 +101,9 @@ my-project/
 │   ├── hooks/
 │   │   ├── domain-update-reminder.sh  ← models.py/services.py 변경 시 DOMAIN.md 업데이트 알림
 │   │   └── insight-collector.sh       ← ★ Insight 블록 자동 수집 → .claude/insights.md
+│   ├── scripts/
+│   │   ├── domain-init.sh           ← DOMAIN.md 스켈레톤 생성 (domain-sync.yml에서 참조)
+│   │   └── domain-fill.sh           ← Claude Code로 DOMAIN.md 채우기 (domain-sync.yml에서 참조)
 │   ├── decisions/
 │   │   └── adr-template.md
 │   └── settings.json
@@ -113,7 +116,8 @@ my-project/
 │       ├── claude.yml               ← Claude 이슈 처리
 │       ├── pr-auto-fill.yml         ← PR 설명 자동 생성
 │       ├── pr-test.yml              ← PR 테스트 실행
-│       └── post-merge-docs.yml      ← 머지 후 문서 동기화
+│       ├── post-merge-docs.yml      ← 머지 후 CHANGELOG 갱신 + API 문서 이슈 생성
+│       └── domain-sync.yml          ← 머지 후 models.py 변경 감지 → DOMAIN.md 자동 갱신
 └── docs/
     └── DOC-SYNC-POLICY.md
 ```
@@ -249,6 +253,33 @@ bash ~/harness-init/scripts/domain-fill.sh   # Claude Code로 내용 채우기 (
 ## 핵심 관계 다이어그램 ← 앱 간 크로스 관계 (domain-fill.sh 자동 생성)
 ## 변경 이력
 ```
+
+---
+
+## GitHub Actions — domain-sync.yml
+
+PR이 `dev` / `prod` 브랜치에 머지될 때 `models.py` 변경이 감지되면 자동으로 DOMAIN.md를 갱신합니다.
+
+### 동작 흐름
+
+```
+PR 머지 (dev/prod)
+  └→ models.py 변경 여부 확인
+       └→ (변경 있음) Claude Code CLI 설치
+            └→ domain-init.sh   ← 새 앱 스켈레톤 생성
+            └→ domain-fill.sh   ← 앱별 + 루트 DOMAIN.md 채우기
+            └→ git commit & push  ← "docs: DOMAIN.md 자동 업데이트"
+```
+
+### 사전 설정 (1회)
+
+GitHub 저장소 → **Settings → Secrets → Actions**에 시크릿 추가:
+
+| 시크릿 이름 | 값 |
+|------------|---|
+| `ANTHROPIC_API_KEY` | Anthropic API 키 |
+
+> `init.sh` 실행 시 `.claude/scripts/domain-init.sh`와 `.claude/scripts/domain-fill.sh`가 자동으로 복사되므로 별도 설정 불필요.
 
 ---
 

@@ -81,6 +81,13 @@ if [ -d "$TEMPLATE_DIR/django/.claude/hooks" ]; then
   success "hooks 설치 완료"
 fi
 
+# scripts 복사 (domain-sync GitHub Actions에서 참조)
+mkdir -p "$TARGET_DIR/.claude/scripts"
+cp "$SCRIPT_DIR/scripts/domain-init.sh" "$TARGET_DIR/.claude/scripts/domain-init.sh"
+cp "$SCRIPT_DIR/scripts/domain-fill.sh" "$TARGET_DIR/.claude/scripts/domain-fill.sh"
+chmod +x "$TARGET_DIR/.claude/scripts/"*.sh
+success "scripts 설치 완료"
+
 # settings.json (없을 때만 생성)
 if [ ! -f "$TARGET_DIR/.claude/settings.json" ]; then
   cp "$TEMPLATE_DIR/django/.claude/settings.json" "$TARGET_DIR/.claude/settings.json"
@@ -257,7 +264,7 @@ echo "  슬래시 커맨드:"
 echo "  /orchestrator   /review   /explore   /implement   /debug   /autopilot"
 echo ""
 echo "  GitHub Actions:"
-echo "  claude-code-review · claude · pr-auto-fill · pr-test · post-merge-docs"
+echo "  claude-code-review · claude · pr-auto-fill · pr-test · post-merge-docs · domain-sync"
 echo ""
 
 if IS_JS_ENV; then

@@ -205,7 +205,7 @@ analyst → architect → coder ⇄ tester → reviewer
 하네스 팀 실행 후 아래 `/goal`을 설정하면 reviewer 승인까지 파이프라인이 자동으로 반복됩니다:
 
 ```
-/goal reviewer가 CLAUDE.md 레이어 규칙 위반 없음을 확인하고 pytest가 모두 통과할 때까지. or stop after 20 turns
+/goal reviewer가 CLAUDE.md 레이어 규칙 위반 없음을 확인하고, pytest 실행 결과가 대화에 출력되어 모두 PASSED임을 확인할 때까지. or stop after 20 turns
 ```
 
 reviewer가 반려하면 Claude가 자동으로 coder → tester → reviewer 루프를 재실행합니다. 매 턴 후 독립 평가자(Haiku)가 조건을 판단하므로 작업 모델과 분리되어 판정됩니다.

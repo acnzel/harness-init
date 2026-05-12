@@ -200,6 +200,16 @@ analyst → architect → coder ⇄ tester → reviewer
 
 오케스트레이터 스킬: `.claude/skills/orchestrator/SKILL.md`
 
+### /goal로 파이프라인 자동 루프
+
+하네스 팀 실행 후 아래 `/goal`을 설정하면 reviewer 승인까지 파이프라인이 자동으로 반복됩니다:
+
+```
+/goal reviewer가 CLAUDE.md 레이어 규칙 위반 없음을 확인하고 pytest가 모두 통과할 때까지. or stop after 20 turns
+```
+
+reviewer가 반려하면 Claude가 자동으로 coder → tester → reviewer 루프를 재실행합니다. 매 턴 후 독립 평가자(Haiku)가 조건을 판단하므로 작업 모델과 분리되어 판정됩니다.
+
 ### 제외 조건 (이 팀을 쓰지 말 것)
 
 - 단순 typo·주석 1~2줄 수정 → 직접 편집

@@ -25,15 +25,15 @@ fi
 
 # ── DOMAIN.md 존재 여부 확인 ────────────────────────────
 if ! find "$TARGET_DIR" -name "DOMAIN.md" \
-    ! -path "*/.venv/*" ! -path "*/venv/*" ! -path "*/.git/*" \
-    2>/dev/null | grep -q .; then
+    ! -path "*/migrations/*" ! -path "*/.venv/*" ! -path "*/venv/*" \
+    ! -path "*/env/*" ! -path "*/__pycache__/*" ! -path "*/.git/*" | grep -q .; then
   warn "DOMAIN.md 파일이 없습니다. domain-init.sh를 먼저 실행하세요."
   exit 0
 fi
 
 info "Claude Code /goal로 DOMAIN.md 자동 채우기 시작..."
 
-GOAL="프로젝트의 모든 Django 앱(migrations, venv, env, __pycache__, .git 제외) DOMAIN.md를 해당 models.py의 실제 필드·관계·Choices로 채우고, 루트 DOMAIN.md의 앱 인덱스·Quick Reference·관계 다이어그램을 업데이트할 것. 각 앱 완료 시 반드시 '✓ {앱명} DOMAIN.md 완료'를 출력할 것. 코드에 없는 내용은 절대 추가하지 말 것. or stop after 30 turns"
+GOAL="프로젝트의 모든 Django 앱(migrations, venv, env, __pycache__, .git 제외)의 DOMAIN.md 스켈레톤이 없으면 생성하고, 해당 models.py의 실제 필드·관계·Choices로 채운 뒤, 루트 DOMAIN.md의 앱 인덱스·Quick Reference·관계 다이어그램을 업데이트할 것. 각 앱 완료 시 반드시 '✓ {앱명} DOMAIN.md 완료'를 출력할 것. 코드에 없는 내용은 절대 추가하지 말 것. or stop after 50 turns"
 
 (cd "$TARGET_DIR" && claude --dangerously-skip-permissions -p "/goal $GOAL" </dev/null)
 EXIT_CODE=$?

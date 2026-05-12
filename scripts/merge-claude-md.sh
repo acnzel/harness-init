@@ -15,6 +15,10 @@ if [ -f "$TARGET_FILE" ]; then
     echo -e "\033[1;33m[harness]\033[0m CLAUDE.md 이미 harness 설정 포함, 건너뜀"
     exit 0
   fi
+  # 기존 파일 백업 (수정 전)
+  BACKUP_FILE="${TARGET_FILE}.bak.$(date +%Y%m%d_%H%M%S)"
+  cp "$TARGET_FILE" "$BACKUP_FILE"
+  echo -e "\033[0;34m[harness]\033[0m 기존 CLAUDE.md 백업: $(basename "$BACKUP_FILE")"
   {
     echo ""
     echo "$MARKER"

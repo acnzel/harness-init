@@ -42,6 +42,22 @@ if [ -z "$ENV_TYPE" ]; then
   fi
 fi
 
+# ── Atlassian MCP 연동 여부 ────────────────────────────
+USE_ATLASSIAN_MCP="${USE_ATLASSIAN_MCP:-}"
+if [ -z "$USE_ATLASSIAN_MCP" ] && [ -t 0 ]; then
+  echo -e "${BLUE}  Atlassian MCP 연동을 설정하시겠어요? (Jira·Confluence 연동)${NC}"
+  echo "  1) 예 — settings.json에 MCP 서버 추가"
+  echo "  2) 아니오"
+  echo ""
+  printf "  선택 [1-2]: "
+  read -r ATLASSIAN_CHOICE || ATLASSIAN_CHOICE="2"
+  case "$ATLASSIAN_CHOICE" in
+    1) USE_ATLASSIAN_MCP="yes" ;;
+    *) USE_ATLASSIAN_MCP="no"  ;;
+  esac
+  echo ""
+fi
+
 # ── 스택 감지 ──────────────────────────────────────────
 STACK=$(bash "$SCRIPT_DIR/scripts/migration.sh" --detect "$TARGET_DIR")
 info "감지된 스택: $STACK"
@@ -94,6 +110,40 @@ if [ ! -f "$TARGET_DIR/.claude/settings.json" ]; then
   success "settings.json 생성 완료"
 else
   warn ".claude/settings.json 이미 존재, 건너뜀"
+fi
+
+# Atlassian MCP 설정 주입
+if [ "$USE_ATLASSIAN_MCP" = "yes" ]; then
+  if ! command -v python3 &>/dev/null; then
+    warn "python3가 설치되어 있지 않아 Atlassian MCP 설정을 주입할 수 없습니다. 수동으로 설정해 주세요."
+  else
+    SETTINGS_FILE="$TARGET_DIR/.claude/settings.json"
+    python3 - "$SETTINGS_FILE" <<'PYEOF'
+import json, sys
+
+path = sys.argv[1]
+try:
+    with open(path) as f:
+        cfg = json.load(f)
+except (FileNotFoundError, json.JSONDecodeError):
+    cfg = {}
+
+cfg.setdefault("mcpServers", {})["atlassian"] = {
+    "command": "npx",
+    "args": ["-y", "@atlassian/mcp-atlassian"],
+    "env": {
+        "ATLASSIAN_SITE_URL": "",
+        "ATLASSIAN_USER_EMAIL": "",
+        "ATLASSIAN_API_TOKEN": ""
+    }
+}
+
+with open(path, "w") as f:
+    json.dump(cfg, f, indent=2, ensure_ascii=False)
+    f.write("\n")
+PYEOF
+    success "Atlassian MCP 설정 주입 완료"
+  fi
 fi
 
 # .gemini 복사
@@ -320,6 +370,27 @@ echo "  · 이슈 자동 처리 불가 (claude)"
 echo ""
 echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
+
+if [ "$USE_ATLASSIAN_MCP" = "yes" ]; then
+  echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo -e "${YELLOW}  🔗 Atlassian MCP 연동 설정 필요${NC}"
+  echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo ""
+  echo "  .claude/settings.json → mcpServers.atlassian.env 에 아래 값을 채우세요:"
+  echo ""
+  echo "  ┌──────────────────────────┬──────────────────────────────────────┐"
+  echo "  │ 환경 변수                │ 값                                   │"
+  echo "  ├──────────────────────────┼──────────────────────────────────────┤"
+  echo "  │ ATLASSIAN_SITE_URL       │ https://your-domain.atlassian.net    │"
+  echo "  │ ATLASSIAN_USER_EMAIL     │ your-email@example.com               │"
+  echo "  │ ATLASSIAN_API_TOKEN      │ Atlassian API 토큰                   │"
+  echo "  └──────────────────────────┴──────────────────────────────────────┘"
+  echo ""
+  echo "  API 토큰 발급: https://id.atlassian.com/manage-profile/security/api-tokens"
+  echo ""
+  echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo ""
+fi
 
 if IS_JS_ENV; then
   echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"

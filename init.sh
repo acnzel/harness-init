@@ -114,13 +114,19 @@ fi
 
 # Atlassian MCP 설정 주입
 if [ "$USE_ATLASSIAN_MCP" = "yes" ]; then
-  SETTINGS_FILE="$TARGET_DIR/.claude/settings.json"
-  python3 - "$SETTINGS_FILE" <<'PYEOF'
+  if ! command -v python3 &>/dev/null; then
+    warn "python3가 설치되어 있지 않아 Atlassian MCP 설정을 주입할 수 없습니다. 수동으로 설정해 주세요."
+  else
+    SETTINGS_FILE="$TARGET_DIR/.claude/settings.json"
+    python3 - "$SETTINGS_FILE" <<'PYEOF'
 import json, sys
 
 path = sys.argv[1]
-with open(path) as f:
-    cfg = json.load(f)
+try:
+    with open(path) as f:
+        cfg = json.load(f)
+except (FileNotFoundError, json.JSONDecodeError):
+    cfg = {}
 
 cfg.setdefault("mcpServers", {})["atlassian"] = {
     "command": "npx",
@@ -136,7 +142,8 @@ with open(path, "w") as f:
     json.dump(cfg, f, indent=2, ensure_ascii=False)
     f.write("\n")
 PYEOF
-  success "Atlassian MCP 설정 주입 완료"
+    success "Atlassian MCP 설정 주입 완료"
+  fi
 fi
 
 # .gemini 복사

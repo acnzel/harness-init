@@ -42,6 +42,22 @@ if [ -z "$ENV_TYPE" ]; then
   fi
 fi
 
+# ── Atlassian MCP 연동 여부 ────────────────────────────
+USE_ATLASSIAN_MCP="${USE_ATLASSIAN_MCP:-}"
+if [ -z "$USE_ATLASSIAN_MCP" ] && [ -t 0 ]; then
+  echo -e "${BLUE}  Atlassian MCP 연동을 설정하시겠어요? (Jira·Confluence 연동)${NC}"
+  echo "  1) 예 — settings.json에 MCP 서버 추가"
+  echo "  2) 아니오"
+  echo ""
+  printf "  선택 [1-2]: "
+  read -r ATLASSIAN_CHOICE || ATLASSIAN_CHOICE="2"
+  case "$ATLASSIAN_CHOICE" in
+    1) USE_ATLASSIAN_MCP="yes" ;;
+    *) USE_ATLASSIAN_MCP="no"  ;;
+  esac
+  echo ""
+fi
+
 # ── 스택 감지 ──────────────────────────────────────────
 STACK=$(bash "$SCRIPT_DIR/scripts/migration.sh" --detect "$TARGET_DIR")
 info "감지된 스택: $STACK"
@@ -81,12 +97,53 @@ if [ -d "$TEMPLATE_DIR/django/.claude/hooks" ]; then
   success "hooks 설치 완료"
 fi
 
+# scripts 복사 (domain-sync GitHub Actions에서 참조)
+mkdir -p "$TARGET_DIR/.claude/scripts"
+cp "$SCRIPT_DIR/scripts/domain-init.sh" "$TARGET_DIR/.claude/scripts/domain-init.sh"
+cp "$SCRIPT_DIR/scripts/domain-fill.sh" "$TARGET_DIR/.claude/scripts/domain-fill.sh"
+chmod +x "$TARGET_DIR/.claude/scripts/"*.sh
+success "scripts 설치 완료"
+
 # settings.json (없을 때만 생성)
 if [ ! -f "$TARGET_DIR/.claude/settings.json" ]; then
   cp "$TEMPLATE_DIR/django/.claude/settings.json" "$TARGET_DIR/.claude/settings.json"
   success "settings.json 생성 완료"
 else
   warn ".claude/settings.json 이미 존재, 건너뜀"
+fi
+
+# Atlassian MCP 설정 주입
+if [ "$USE_ATLASSIAN_MCP" = "yes" ]; then
+  if ! command -v python3 &>/dev/null; then
+    warn "python3가 설치되어 있지 않아 Atlassian MCP 설정을 주입할 수 없습니다. 수동으로 설정해 주세요."
+  else
+    SETTINGS_FILE="$TARGET_DIR/.claude/settings.json"
+    python3 - "$SETTINGS_FILE" <<'PYEOF'
+import json, sys
+
+path = sys.argv[1]
+try:
+    with open(path) as f:
+        cfg = json.load(f)
+except (FileNotFoundError, json.JSONDecodeError):
+    cfg = {}
+
+cfg.setdefault("mcpServers", {})["atlassian"] = {
+    "command": "npx",
+    "args": ["-y", "@atlassian/mcp-atlassian"],
+    "env": {
+        "ATLASSIAN_SITE_URL": "",
+        "ATLASSIAN_USER_EMAIL": "",
+        "ATLASSIAN_API_TOKEN": ""
+    }
+}
+
+with open(path, "w") as f:
+    json.dump(cfg, f, indent=2, ensure_ascii=False)
+    f.write("\n")
+PYEOF
+    success "Atlassian MCP 설정 주입 완료"
+  fi
 fi
 
 # .gemini 복사
@@ -203,6 +260,37 @@ if [ "$STACK" != "django" ]; then
   bash "$SCRIPT_DIR/scripts/migration.sh" "$TARGET_DIR"
 fi
 
+# ── JS 환경 전용 파일 오버라이드 ───────────────────────
+# migration.sh가 Django 기반으로 변환한 내용을 JS 전용 버전으로 덮어쓴다
+if IS_JS_ENV; then
+  info "JS/TS 환경 전용 파일 적용 중..."
+
+  # agents 오버라이드 (Django → JS/TS 레이어 패턴)
+  if [ -d "$TEMPLATE_DIR/js/.claude/agents" ]; then
+    cp -rf "$TEMPLATE_DIR/js/.claude/agents/"* "$TARGET_DIR/.claude/agents/" 2>/dev/null || true
+    success "JS agents 적용 완료"
+  fi
+
+  # hooks 오버라이드 (models.py 감지 → schema/entity 파일 감지)
+  if [ -d "$TEMPLATE_DIR/js/.claude/hooks" ]; then
+    cp -f "$TEMPLATE_DIR/js/.claude/hooks/"* "$TARGET_DIR/.claude/hooks/" 2>/dev/null || true
+    chmod +x "$TARGET_DIR/.claude/hooks/"*.sh 2>/dev/null || true
+    success "JS hooks 적용 완료"
+  fi
+
+  # GitHub Actions 오버라이드 (pytest → npm test)
+  if [ -f "$TEMPLATE_DIR/js/.github/workflows/pr-test.yml" ]; then
+    cp -f "$TEMPLATE_DIR/js/.github/workflows/pr-test.yml" "$TARGET_DIR/.github/workflows/pr-test.yml"
+    success "JS pr-test.yml 적용 완료"
+  fi
+
+  # CLAUDE.md 오버라이드 (Django 아키텍처 규칙 → JS/TS 아키텍처 규칙)
+  if [ -f "$TEMPLATE_DIR/js/CLAUDE.md" ]; then
+    cp -f "$TEMPLATE_DIR/js/CLAUDE.md" "$TARGET_DIR/CLAUDE.md"
+    success "JS CLAUDE.md 적용 완료"
+  fi
+fi
+
 # ── 기존 프로젝트이면 DOMAIN.md 스켈레톤 생성 ──────────
 # models.py 가 마이그레이션 외에 존재하면 기개발 프로젝트로 판단
 EXISTING_MODELS=$(find "$TARGET_DIR" -name "models.py" \
@@ -217,6 +305,9 @@ EXISTING_MODELS=$(find "$TARGET_DIR" -name "models.py" \
 if ! IS_JS_ENV && [ -n "$EXISTING_MODELS" ]; then
   info "기존 Django 앱 감지 — DOMAIN.md 스켈레톤 생성 중..."
   bash "$SCRIPT_DIR/scripts/domain-init.sh" "$TARGET_DIR"
+
+  # Claude Code로 스켈레톤을 실제 코드 내용으로 채운다
+  bash "$SCRIPT_DIR/scripts/domain-fill.sh" "$TARGET_DIR"
 fi
 
 # ── 완료 메시지 ────────────────────────────────────────
@@ -254,8 +345,52 @@ echo "  슬래시 커맨드:"
 echo "  /orchestrator   /review   /explore   /implement   /debug   /autopilot"
 echo ""
 echo "  GitHub Actions:"
-echo "  claude-code-review · claude · pr-auto-fill · pr-test · post-merge-docs"
+echo "  claude-code-review · claude · pr-auto-fill · pr-test · post-merge-docs · domain-sync"
 echo ""
+
+RED='\033[0;31m'
+echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${RED}  ⚠  필수 설정 — 하지 않으면 Harness가 동작하지 않습니다${NC}"
+echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+echo "  GitHub 저장소 → Settings → Secrets and variables → Actions"
+echo "  아래 시크릿을 추가하세요:"
+echo ""
+echo "  ┌─────────────────────────┬──────────────────────────────┐"
+echo "  │ 시크릿 이름             │ 설명                         │"
+echo "  ├─────────────────────────┼──────────────────────────────┤"
+echo "  │ ANTHROPIC_API_KEY       │ Claude AI API 키             │"
+echo "  │                         │ (domain-sync · claude-code-review · claude 워크플로우) │"
+echo "  └─────────────────────────┴──────────────────────────────┘"
+echo ""
+echo "  ANTHROPIC_API_KEY 없이는:"
+echo "  · PR 머지 후 DOMAIN.md 자동 갱신 불가 (domain-sync)"
+echo "  · PR 자동 코드 리뷰 불가 (claude-code-review)"
+echo "  · 이슈 자동 처리 불가 (claude)"
+echo ""
+echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+
+if [ "$USE_ATLASSIAN_MCP" = "yes" ]; then
+  echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo -e "${YELLOW}  🔗 Atlassian MCP 연동 설정 필요${NC}"
+  echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo ""
+  echo "  .claude/settings.json → mcpServers.atlassian.env 에 아래 값을 채우세요:"
+  echo ""
+  echo "  ┌──────────────────────────┬──────────────────────────────────────┐"
+  echo "  │ 환경 변수                │ 값                                   │"
+  echo "  ├──────────────────────────┼──────────────────────────────────────┤"
+  echo "  │ ATLASSIAN_SITE_URL       │ https://your-domain.atlassian.net    │"
+  echo "  │ ATLASSIAN_USER_EMAIL     │ your-email@example.com               │"
+  echo "  │ ATLASSIAN_API_TOKEN      │ Atlassian API 토큰                   │"
+  echo "  └──────────────────────────┴──────────────────────────────────────┘"
+  echo ""
+  echo "  API 토큰 발급: https://id.atlassian.com/manage-profile/security/api-tokens"
+  echo ""
+  echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo ""
+fi
 
 if IS_JS_ENV; then
   echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"

@@ -46,7 +46,7 @@ echo ""
 
 FAILED_APPS=""
 
-echo "$APPS" | while read -r models_file; do
+while IFS= read -r models_file; do
   app_dir=$(dirname "$models_file")
   app_name=$(basename "$app_dir")
   domain_file="$app_dir/DOMAIN.md"
@@ -94,7 +94,7 @@ Rules:
 - Only replace placeholder/TODO content with real extracted data.
 - Write the result directly to '${app_name}/DOMAIN.md'."
 
-  if (cd "$TARGET_DIR" && claude --dangerously-skip-permissions -p "$PROMPT" 2>/dev/null); then
+  if (cd "$TARGET_DIR" && claude --dangerously-skip-permissions -p "$PROMPT" </dev/null 2>/dev/null); then
     success "  $app_name DOMAIN.md 채우기 완료"
   else
     warn "  $app_name 채우기 실패 — 수동으로 채우거나 재실행하세요"
@@ -102,7 +102,14 @@ Rules:
   fi
 
   echo ""
-done
+done < <(find "$TARGET_DIR" -name "models.py" \
+  ! -path "*/migrations/*" \
+  ! -path "*/.venv/*" \
+  ! -path "*/venv/*" \
+  ! -path "*/env/*" \
+  ! -path "*/__pycache__/*" \
+  ! -path "*/.git/*" \
+  2>/dev/null)
 
 # ── 완료 요약 ────────────────────────────────────────────
 echo ""

@@ -58,11 +58,15 @@ while IFS= read -r models_file; do
 
   info "  → $app_name 분석 중..."
 
+  # TARGET_DIR 기준 상대 경로 계산 (중첩 앱 구조 지원)
+  rel_models_file="${models_file#$TARGET_DIR/}"
+  rel_domain_file="${domain_file#$TARGET_DIR/}"
+
   PROMPT="You are filling in a DOMAIN.md skeleton for the Django app '${app_name}'.
 
-Step 1: Read the file '${app_name}/models.py' carefully.
-Step 2: Read the current '${app_name}/DOMAIN.md' to understand its structure.
-Step 3: Fill in the following sections of '${app_name}/DOMAIN.md' using ONLY information found in models.py:
+Step 1: Read the file '${rel_models_file}' carefully.
+Step 2: Read the current '${rel_domain_file}' to understand its structure.
+Step 3: Fill in the following sections of '${rel_domain_file}' using ONLY information found in models.py:
 
 ## 도메인 계층 구조
 - Draw a text tree showing model hierarchy.
@@ -90,11 +94,11 @@ Step 3: Fill in the following sections of '${app_name}/DOMAIN.md' using ONLY inf
 Rules:
 - Extract ONLY from the actual code. Do not invent fields.
 - For '역할', '비즈니스 규칙', '주요 흐름' — write 'TODO' if not clear from the code.
-- Preserve the existing Markdown headings and structure of ${app_name}/DOMAIN.md.
+- Preserve the existing Markdown headings and structure of ${rel_domain_file}.
 - Only replace placeholder/TODO content with real extracted data.
-- Write the result directly to '${app_name}/DOMAIN.md'."
+- Write the result directly to '${rel_domain_file}'."
 
-  if (cd "$TARGET_DIR" && claude --dangerously-skip-permissions -p "$PROMPT" </dev/null 2>/dev/null); then
+  if (cd "$TARGET_DIR" && claude --dangerously-skip-permissions -p "$PROMPT" </dev/null); then
     success "  $app_name DOMAIN.md 채우기 완료"
   else
     warn "  $app_name 채우기 실패 — 수동으로 채우거나 재실행하세요"
@@ -127,7 +131,7 @@ if [ -f "$ROOT_DOMAIN" ]; then
 
 Step 1: Read the root 'DOMAIN.md' to understand its current structure.
 Step 2: Read each of the following app-level DOMAIN.md files to understand the domain knowledge:
-$(echo "$APP_DOMAIN_LIST" | sed "s|$TARGET_DIR/||g" | sed 's/^/  - /')
+$(echo "$APP_DOMAIN_LIST" | while IFS= read -r f; do echo "  - ${f#$TARGET_DIR/}"; done)
 
 Step 3: Update the root 'DOMAIN.md' by filling in ALL sections that contain <!-- TODO --> placeholders:
 
@@ -156,7 +160,7 @@ Rules:
 - Only replace <!-- TODO --> placeholders. Do not remove existing content.
 - Write the updated content directly to 'DOMAIN.md'."
 
-  if (cd "$TARGET_DIR" && claude --dangerously-skip-permissions -p "$ROOT_PROMPT" </dev/null 2>/dev/null); then
+  if (cd "$TARGET_DIR" && claude --dangerously-skip-permissions -p "$ROOT_PROMPT" </dev/null); then
     success "루트 DOMAIN.md 통합 채우기 완료"
   else
     warn "루트 DOMAIN.md 채우기 실패 — 수동으로 채우거나 재실행하세요"

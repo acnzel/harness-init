@@ -9,9 +9,7 @@ on:
 
 jobs:
   domain-sync:
-    if: |
-      github.event.pull_request.merged == true &&
-      contains(join(github.event.pull_request.changed_files.*.filename, ','), 'models.py')
+    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -30,10 +28,10 @@ jobs:
           HEAD_SHA="${{ github.event.pull_request.merge_commit_sha }}"
           CHANGED=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
 
-          if echo "$CHANGED" | grep -q "models\.py"; then
+          if echo "$CHANGED" | grep -qE '(^|/)models\.py$'; then
             echo "has_model_changes=true" >> $GITHUB_OUTPUT
             echo "Changed models.py files:"
-            echo "$CHANGED" | grep "models\.py"
+            echo "$CHANGED" | grep -E '(^|/)models\.py$'
           else
             echo "has_model_changes=false" >> $GITHUB_OUTPUT
             echo "No models.py changes detected — skipping DOMAIN.md sync"

@@ -111,6 +111,60 @@ done < <(find "$TARGET_DIR" -name "models.py" \
   ! -path "*/.git/*" \
   2>/dev/null)
 
+# ── 루트 DOMAIN.md 통합 채우기 ──────────────────────────
+ROOT_DOMAIN="$TARGET_DIR/DOMAIN.md"
+if [ -f "$ROOT_DOMAIN" ]; then
+  info "루트 DOMAIN.md 통합 채우기 중..."
+
+  # 채워진 앱별 DOMAIN.md 목록 수집
+  APP_DOMAIN_LIST=$(find "$TARGET_DIR" -name "DOMAIN.md" \
+    ! -path "$ROOT_DOMAIN" \
+    ! -path "*/.venv/*" ! -path "*/venv/*" ! -path "*/env/*" \
+    ! -path "*/.git/*" ! -path "*/__pycache__/*" \
+    2>/dev/null | sort)
+
+  ROOT_PROMPT="You are synthesizing a root DOMAIN.md for the Django project at the current directory.
+
+Step 1: Read the root 'DOMAIN.md' to understand its current structure.
+Step 2: Read each of the following app-level DOMAIN.md files to understand the domain knowledge:
+$(echo "$APP_DOMAIN_LIST" | sed "s|$TARGET_DIR/||g" | sed 's/^/  - /')
+
+Step 3: Update the root 'DOMAIN.md' by filling in ALL sections that contain <!-- TODO --> placeholders:
+
+### 도메인 문서 구조 / 앱별 DOMAIN.md 인덱스 테이블
+- Replace each '<!-- TODO: 한 줄 설명 -->' with a real one-line description of what that app does (based on its models and domain).
+
+### Quick Reference (빠른 검색용)
+- Fill the table with the most important domain terms across ALL apps.
+- For each term: Korean term, English/code name, which app/domain, and a link to the relevant app DOMAIN.md.
+- Include at least 10 meaningful terms extracted from model names, field names, and choices.
+
+### 슬랭 / 내부 용어
+- If you find any obvious internal shorthand, abbreviations, or aliases in model/field names across apps, list them.
+- If nothing obvious, write a comment explaining the naming patterns found.
+
+### 핵심 관계 다이어그램
+- Draw a cross-app relationship tree showing FK/M2M/O2O relationships BETWEEN apps (not within a single app).
+- Format:
+  AppA.ModelX
+  ├── FK → AppB.ModelY
+  └── M2M → AppC.ModelZ
+
+Rules:
+- Extract ONLY from actual code via the app DOMAIN.md files. Do not invent relationships.
+- Preserve all existing Markdown structure and headings in root DOMAIN.md.
+- Only replace <!-- TODO --> placeholders. Do not remove existing content.
+- Write the updated content directly to 'DOMAIN.md'."
+
+  if (cd "$TARGET_DIR" && claude --dangerously-skip-permissions -p "$ROOT_PROMPT" </dev/null 2>/dev/null); then
+    success "루트 DOMAIN.md 통합 채우기 완료"
+  else
+    warn "루트 DOMAIN.md 채우기 실패 — 수동으로 채우거나 재실행하세요"
+  fi
+else
+  warn "루트 DOMAIN.md 없음 — domain-init.sh 먼저 실행하세요"
+fi
+
 # ── 완료 요약 ────────────────────────────────────────────
 echo ""
 if [ -z "$FAILED_APPS" ]; then

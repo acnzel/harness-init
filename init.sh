@@ -81,6 +81,13 @@ if [ -d "$TEMPLATE_DIR/django/.claude/hooks" ]; then
   success "hooks 설치 완료"
 fi
 
+# scripts 복사 (domain-sync GitHub Actions에서 참조)
+mkdir -p "$TARGET_DIR/.claude/scripts"
+cp "$SCRIPT_DIR/scripts/domain-init.sh" "$TARGET_DIR/.claude/scripts/domain-init.sh"
+cp "$SCRIPT_DIR/scripts/domain-fill.sh" "$TARGET_DIR/.claude/scripts/domain-fill.sh"
+chmod +x "$TARGET_DIR/.claude/scripts/"*.sh
+success "scripts 설치 완료"
+
 # settings.json (없을 때만 생성)
 if [ ! -f "$TARGET_DIR/.claude/settings.json" ]; then
   cp "$TEMPLATE_DIR/django/.claude/settings.json" "$TARGET_DIR/.claude/settings.json"
@@ -248,6 +255,9 @@ EXISTING_MODELS=$(find "$TARGET_DIR" -name "models.py" \
 if ! IS_JS_ENV && [ -n "$EXISTING_MODELS" ]; then
   info "기존 Django 앱 감지 — DOMAIN.md 스켈레톤 생성 중..."
   bash "$SCRIPT_DIR/scripts/domain-init.sh" "$TARGET_DIR"
+
+  # Claude Code로 스켈레톤을 실제 코드 내용으로 채운다
+  bash "$SCRIPT_DIR/scripts/domain-fill.sh" "$TARGET_DIR"
 fi
 
 # ── 완료 메시지 ────────────────────────────────────────
@@ -285,7 +295,30 @@ echo "  슬래시 커맨드:"
 echo "  /orchestrator   /review   /explore   /implement   /debug   /autopilot"
 echo ""
 echo "  GitHub Actions:"
-echo "  claude-code-review · claude · pr-auto-fill · pr-test · post-merge-docs"
+echo "  claude-code-review · claude · pr-auto-fill · pr-test · post-merge-docs · domain-sync"
+echo ""
+
+RED='\033[0;31m'
+echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${RED}  ⚠  필수 설정 — 하지 않으면 Harness가 동작하지 않습니다${NC}"
+echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+echo "  GitHub 저장소 → Settings → Secrets and variables → Actions"
+echo "  아래 시크릿을 추가하세요:"
+echo ""
+echo "  ┌─────────────────────────┬──────────────────────────────┐"
+echo "  │ 시크릿 이름             │ 설명                         │"
+echo "  ├─────────────────────────┼──────────────────────────────┤"
+echo "  │ ANTHROPIC_API_KEY       │ Claude AI API 키             │"
+echo "  │                         │ (domain-sync · claude-code-review · claude 워크플로우) │"
+echo "  └─────────────────────────┴──────────────────────────────┘"
+echo ""
+echo "  ANTHROPIC_API_KEY 없이는:"
+echo "  · PR 머지 후 DOMAIN.md 자동 갱신 불가 (domain-sync)"
+echo "  · PR 자동 코드 리뷰 불가 (claude-code-review)"
+echo "  · 이슈 자동 처리 불가 (claude)"
+echo ""
+echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
 if IS_JS_ENV; then

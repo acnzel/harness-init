@@ -217,6 +217,9 @@ EXISTING_MODELS=$(find "$TARGET_DIR" -name "models.py" \
 if ! IS_JS_ENV && [ -n "$EXISTING_MODELS" ]; then
   info "기존 Django 앱 감지 — DOMAIN.md 스켈레톤 생성 중..."
   bash "$SCRIPT_DIR/scripts/domain-init.sh" "$TARGET_DIR"
+
+  # Claude Code로 스켈레톤을 실제 코드 내용으로 채운다
+  bash "$SCRIPT_DIR/scripts/domain-fill.sh" "$TARGET_DIR"
 fi
 
 # ── 완료 메시지 ────────────────────────────────────────

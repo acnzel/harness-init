@@ -65,9 +65,10 @@ bash ~/harness-init/init.sh
 `init.sh`가 자동으로 처리하는 것:
 
 1. **스택 감지** — `manage.py` / `requirements.txt` / `package.json` 등으로 기술 스택 식별
-2. **하네스 설치** — Django 템플릿 기반으로 `.claude/`, `.github/`, `.gemini/` 구성
+2. **하네스 설치** — Django/JS 템플릿 기반으로 `.claude/`, `.github/`, `.gemini/` 구성
 3. **스택 마이그레이션** — 비 Django 스택이면 `migration.sh`가 내용을 해당 스택으로 자동 변환
 4. **DOMAIN.md 생성** — 기존 Django 앱이 있으면 `domain-init.sh`가 앱별 도메인 문서 스켈레톤 생성
+5. **DOMAIN.md 자동 채우기** — `domain-fill.sh`가 Claude Code로 각 앱의 `models.py`를 분석해 실제 내용을 채운 뒤, 루트 `DOMAIN.md`까지 통합 합성
 
 ### 설치 결과
 
@@ -181,21 +182,43 @@ pre-commit run --all-files
 
 ## DOMAIN.md — 도메인 지식 관리
 
-기존 프로젝트에 harness를 설치하면 앱별 도메인 문서가 자동 생성됩니다.
+기존 프로젝트에 harness를 설치하면 앱별 도메인 문서가 자동 생성되고 내용까지 채워집니다.
 
-### 자동 생성 (init.sh)
+### 자동 생성 + 채우기 (init.sh)
 
 ```bash
 bash ~/harness-init/init.sh
-# → models.py가 있는 Django 앱마다 {app}/DOMAIN.md 스켈레톤 생성
-# → 루트 DOMAIN.md에 전체 앱 인덱스 + 업데이트 정책 생성
 ```
 
-신규 프로젝트는 앱 개발 후 직접 실행:
+내부적으로 3단계가 순서대로 실행됩니다:
+
+| 단계 | 스크립트 | 결과 |
+|------|---------|------|
+| 1. 스켈레톤 생성 | `domain-init.sh` | 앱별 `DOMAIN.md` 빈 틀 + 루트 인덱스 |
+| 2. 앱별 채우기 | `domain-fill.sh` | Claude Code가 `models.py` 분석 → 필드·Choices·관계 자동 주입 |
+| 3. 루트 통합 합성 | `domain-fill.sh` (마지막 단계) | 모든 앱 DOMAIN.md를 읽어 Quick Reference·관계 다이어그램·앱 설명 합성 |
+
+신규 프로젝트는 앱 개발 후 단계별로 직접 실행:
 
 ```bash
-bash ~/harness-init/scripts/domain-init.sh
+bash ~/harness-init/scripts/domain-init.sh   # 스켈레톤 생성
+bash ~/harness-init/scripts/domain-fill.sh   # Claude Code로 내용 채우기 (Claude Code 설치 필요)
 ```
+
+### domain-fill.sh 상세 동작
+
+```
+1. models.py가 있는 앱을 순회
+   └→ claude -p로 models.py 분석 → 앱별 DOMAIN.md에 필드/Choices/관계 주입
+
+2. 모든 앱 완료 후 루트 DOMAIN.md 통합 합성
+   └→ 앱 설명 (인덱스 테이블 TODO 교체)
+   └→ Quick Reference 10개 이상 용어 추출
+   └→ 슬랭/내부 용어 패턴 정리
+   └→ 앱 간 FK/M2M/O2O 관계 다이어그램 생성
+```
+
+> Claude Code가 설치되어 있지 않으면 domain-fill.sh는 자동으로 건너뜁니다.
 
 ### 업데이트 사이클
 
@@ -209,11 +232,22 @@ bash ~/harness-init/scripts/domain-init.sh
 
 ```markdown
 # {app} 도메인
-## 도메인 계층 구조   ← 모델 트리 (자동 추출)
-## 핵심 모델          ← 모델별 필드·메서드 (TODO 채우기)
-## 상태 코드 / Choices
-## 주요 흐름
+## 도메인 계층 구조   ← 모델 트리 (domain-fill.sh 자동 추출)
+## 핵심 모델          ← 모델별 필드·타입 테이블 (domain-fill.sh 자동 주입)
+## 상태 코드 / Choices ← TextChoices/IntegerChoices 자동 추출
+## 주요 관계          ← FK/M2M/O2O 관계 목록 (domain-fill.sh 자동 추출)
 ## 변경 이력          ← coder가 매 작업 후 갱신
+```
+
+### 루트 DOMAIN.md 구조
+
+```markdown
+# DOMAIN.md - {project} 도메인 지식 사전
+## 도메인 문서 구조   ← 앱별 링크 + 설명 (domain-fill.sh 자동 채우기)
+## Quick Reference    ← 프로젝트 핵심 용어 10개+ (domain-fill.sh 자동 추출)
+## 슬랭 / 내부 용어  ← 팀 내부 축약어·패턴 (domain-fill.sh 자동 감지)
+## 핵심 관계 다이어그램 ← 앱 간 크로스 관계 (domain-fill.sh 자동 생성)
+## 변경 이력
 ```
 
 ---
@@ -249,6 +283,17 @@ cp .claude/decisions/adr-template.md .claude/decisions/001-auth-strategy.md
 
 ---
 
+## 지원 환경
+
+| 환경 | 템플릿 | 에이전트 | 테스트 | pre-commit |
+|------|--------|---------|-------|-----------|
+| Django / FastAPI / Flask | `templates/django/` | pytest + Factory + PropertyMock | ruff | ruff + ruff-format |
+| Next.js / NestJS / Express | `templates/js/` | jest/vitest + factory functions + jest.spyOn | prettier + eslint | prettier + eslint |
+
+JS/TS 환경은 Django 공통 파일(skills, commands, .gemini, docs)을 그대로 재사용하고, 에이전트·hooks·CLAUDE.md·PR 테스트 워크플로우만 JS 전용으로 교체됩니다.
+
+---
+
 ## 템플릿 구조
 
 ```
@@ -256,19 +301,28 @@ harness-init/
 ├── README.md
 ├── init.sh                       ← 메인 실행 스크립트
 ├── templates/
-│   └── django/                   ← harness 템플릿 (타 스택으로 자동 마이그레이션)
-│       ├── CLAUDE.md
+│   ├── django/                   ← Django/Python 전용 템플릿
+│   │   ├── CLAUDE.md             ← 레이어드 아키텍처 규칙 (Views→Services→Repositories)
+│   │   ├── .claude/
+│   │   │   ├── agents/           ← analyst/architect/coder/tester/reviewer (pytest 기반)
+│   │   │   ├── skills/           ← orchestrator + 5개 단독 스킬
+│   │   │   ├── commands/
+│   │   │   ├── hooks/            ← domain-update-reminder.sh (models.py 감지)
+│   │   │   └── decisions/
+│   │   ├── .gemini/
+│   │   ├── .github/
+│   │   └── docs/
+│   └── js/                       ← JS/TS 전용 오버라이드 템플릿
+│       ├── CLAUDE.md             ← Controller/Service/Repository + TypeScript 규칙
+│       ├── DOMAIN.md             ← JS ORM 스키마 안내 (Prisma/TypeORM/Mongoose/Drizzle)
 │       ├── .claude/
-│       │   ├── agents/           ← analyst/architect/coder/tester/reviewer
-│       │   ├── skills/           ← orchestrator + 5개 단독 스킬
-│       │   ├── commands/
-│       │   ├── hooks/            ← domain-update-reminder.sh
-│       │   └── decisions/
-│       ├── .gemini/
-│       ├── .github/
-│       └── docs/
+│       │   ├── agents/           ← analyst/architect/coder/tester/reviewer (jest 기반)
+│       │   └── hooks/            ← domain-update-reminder.sh (schema.prisma/entity.ts 감지)
+│       └── .github/workflows/
+│           └── pr-test.yml       ← Node.js 20 + npm ci + npm test
 └── scripts/
     ├── domain-init.sh            ← 앱별 DOMAIN.md 스켈레톤 생성
+    ├── domain-fill.sh            ← Claude Code로 DOMAIN.md 실제 내용 채우기 + 루트 합성
     ├── migration.sh              ← 스택 감지 + 비 Django 하네스 적응
     └── merge-claude-md.sh        ← CLAUDE.md 주입
 ```

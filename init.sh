@@ -95,15 +95,15 @@ if [ -d "$TEMPLATE_DIR/django/.claude/hooks" ]; then
   cp -rn "$TEMPLATE_DIR/django/.claude/hooks/"* "$TARGET_DIR/.claude/hooks/" 2>/dev/null || true
   chmod +x "$TARGET_DIR/.claude/hooks/"*.sh 2>/dev/null || true
   success "hooks 설치 완료"
+fi
 
-# project debrief-guardrails 생성 (없을 때만)
+# project debrief-guardrails 생성 (없을 때만, 스택 무관)
 PROJECT_NAME=$(basename "$TARGET_DIR")
 if [ ! -f "$TARGET_DIR/.claude/debrief-guardrails.md" ]; then
   sed "s/{{PROJECT_NAME}}/$PROJECT_NAME/" \
     "$TEMPLATE_DIR/base/project-debrief-guardrails.md" \
     > "$TARGET_DIR/.claude/debrief-guardrails.md"
   success "debrief-guardrails.md 생성 완료 (.claude/)"
-fi
 fi
 
 # scripts 복사 (domain-sync GitHub Actions에서 참조)
@@ -356,13 +356,18 @@ with open(path) as f:
 hooks = s.setdefault("hooks", {})
 
 def ensure_hook(hook_list_key, command, timeout):
-    entries = hooks.setdefault(hook_list_key, [{"hooks": []}])
+    entries = hooks.get(hook_list_key, [])
+    if not entries:
+        entries = [{"hooks": []}]
+        hooks[hook_list_key] = entries
     existing = [h["command"] for e in entries for h in e.get("hooks", [])]
     if command not in existing:
         entries[0]["hooks"].append({"type": "command", "command": command, "timeout": timeout})
 
-ensure_hook("Stop",         "~/.claude/hooks/session-stop.sh",          10)
-ensure_hook("SessionStart", "~/.claude/hooks/session-start-context.sh",  5)
+import os
+home = os.environ.get("HOME", "~")
+ensure_hook("Stop",         f"{home}/.claude/hooks/session-stop.sh",          10)
+ensure_hook("SessionStart", f"{home}/.claude/hooks/session-start-context.sh",  5)
 
 with open(path, "w") as f:
     json.dump(s, f, indent=2, ensure_ascii=False)
@@ -374,54 +379,6 @@ else
   warn "  SessionStart: ~/.claude/hooks/session-start-context.sh"
 fi
 
-# ~/.claude/CLAUDE.md에 debrief 작성 지시 추가 (없을 때만)
-GLOBAL_CLAUDE_MD="$GLOBAL_CLAUDE/CLAUDE.md"
-if [ -f "$GLOBAL_CLAUDE_MD" ] && ! grep -q "debrief-guardrails" "$GLOBAL_CLAUDE_MD"; then
-  cat >> "$GLOBAL_CLAUDE_MD" << 'MDEOF'
-
----
-
-## 🔁 세션 Debrief — 자기강화 루프
-
-의미 있는 작업 완료 시 (PR 생성, 버그 수정, 기능 구현, 코드리뷰 처리 등) 아래 두 가지를 순서대로 수행한다.
-
-### 1. debrief 파일 작성
-
-경로: `~/.claude/debriefs/YYYY-MM-DD-debrief.md` (오늘 날짜로 치환)
-
-```markdown
-## HH:MM — 작업명 (티켓/PR번호)
-
-### 무엇을 했나
-- 변경 파일:
-- PR/티켓:
-
-### 핵심 의사결정
-- [결정] → [이유: 왜 다른 선택지가 아닌 이것인가]
-
-### 실수 & 교훈
-- [실수] → [올바른 접근]
-
-### 다음 세션 주의사항
-- [구체적 가드레일]
-```
-
-### 2. guardrails 파일 업데이트
-
-- **행동 패턴 (프로젝트 무관)** → `~/.claude/debrief-guardrails.md` 해당 섹션에 추가
-- **프로젝트 특화 주의사항** → `.claude/debrief-guardrails.md` 해당 섹션에 추가
-- 같은 실수가 2회 이상 반복되면 반드시 guardrails에 등록
-
-### 반드시 기록해야 하는 실수 유형
-
-- 추측으로 답변했다가 틀린 경우
-- AI 리뷰 제안을 검증 없이 적용해 버그가 생긴 경우
-- git diff/log를 먼저 확인하지 않은 경우
-- ID/타입 혼동 (어떤 모델의 PK인지 역추적 없이 사용)
-- 빌드/테스트 실패를 사전에 예측하지 못한 경우
-MDEOF
-  success "~/.claude/CLAUDE.md debrief 지시 추가 완료"
-fi
 
 # ── 완료 메시지 ────────────────────────────────────────
 echo ""

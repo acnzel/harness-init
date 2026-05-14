@@ -6,15 +6,12 @@ GLOBAL_GUARDRAILS="$HOME/.claude/debrief-guardrails.md"
 PROJECT_GUARDRAILS="$(pwd)/.claude/debrief-guardrails.md"
 
 HAS_CONTENT=false
-OUTPUT=""
 
 if [ -f "$GLOBAL_GUARDRAILS" ] && [ -s "$GLOBAL_GUARDRAILS" ]; then
-  OUTPUT="$OUTPUT$(cat "$GLOBAL_GUARDRAILS")\n"
   HAS_CONTENT=true
 fi
 
 if [ -f "$PROJECT_GUARDRAILS" ] && [ -s "$PROJECT_GUARDRAILS" ]; then
-  OUTPUT="$OUTPUT\n$(cat "$PROJECT_GUARDRAILS")\n"
   HAS_CONTENT=true
 fi
 
@@ -22,5 +19,12 @@ if [ "$HAS_CONTENT" = true ]; then
   echo "[PAST SESSION LESSONS]"
   echo "과거 세션에서 누적된 가드레일. 이번 세션에서 같은 실수를 반복하지 말 것."
   echo ""
-  printf "%b\n" "$OUTPUT"
+  if [ -f "$GLOBAL_GUARDRAILS" ] && [ -s "$GLOBAL_GUARDRAILS" ]; then
+    cat "$GLOBAL_GUARDRAILS"
+    echo ""
+  fi
+  if [ -f "$PROJECT_GUARDRAILS" ] && [ -s "$PROJECT_GUARDRAILS" ]; then
+    cat "$PROJECT_GUARDRAILS"
+    echo ""
+  fi
 fi

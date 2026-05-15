@@ -10,8 +10,9 @@ CWD=$(pwd)
 PROJECT=$(basename "$CWD")
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "N/A")
 LAST_COMMIT=$(git log -1 --pretty="%h %s" 2>/dev/null || echo "N/A")
-CHANGED_FILES=$(git diff --name-only HEAD 2>/dev/null | head -10 | sed 's/^/    - /' || git ls-files -m -o --exclude-standard 2>/dev/null | head -10 | sed 's/^/    - /' || echo "    - N/A")
-CHANGED_COUNT=$(git diff --name-only HEAD 2>/dev/null | wc -l | tr -d ' ' 2>/dev/null || echo "0")
+CHANGED_FILES=$( (git diff --name-only HEAD 2>/dev/null; git ls-files --others --exclude-standard 2>/dev/null) | head -10 | sed 's/^/    - /' )
+[ -z "$CHANGED_FILES" ] && CHANGED_FILES="    - N/A"
+CHANGED_COUNT=$( (git diff --name-only HEAD 2>/dev/null; git ls-files --others --exclude-standard 2>/dev/null) | wc -l | tr -d ' ' )
 RECENT_COMMITS=$(git log -3 --pretty="%h %s" 2>/dev/null | sed 's/^/    - /' || echo "    - N/A")
 
 mkdir -p "$DEBRIEF_DIR"

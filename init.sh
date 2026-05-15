@@ -347,25 +347,34 @@ fi
 GLOBAL_SETTINGS="$GLOBAL_CLAUDE/settings.json"
 if [ -f "$GLOBAL_SETTINGS" ]; then
   python3 - "$GLOBAL_SETTINGS" << 'PYEOF'
-import json, sys
+import json, sys, os
 
 path = sys.argv[1]
-with open(path) as f:
-    s = json.load(f)
+try:
+    with open(path) as f:
+        s = json.load(f)
+    if not isinstance(s, dict):
+        s = {}
+except (json.JSONDecodeError, ValueError):
+    s = {}
 
 hooks = s.setdefault("hooks", {})
+if not isinstance(hooks, dict):
+    hooks = {}
+    s["hooks"] = hooks
 
-def ensure_hook(hook_list_key, command, timeout):
-    entries = hooks.get(hook_list_key, [])
-    if not entries:
+def ensure_hook(key, cmd, timeout):
+    entries = hooks.get(key)
+    if not isinstance(entries, list):
         entries = [{"hooks": []}]
-        hooks[hook_list_key] = entries
-    existing = [h["command"] for e in entries for h in e.get("hooks", [])]
-    if command not in existing:
-        entries[0]["hooks"].append({"type": "command", "command": command, "timeout": timeout})
+        hooks[key] = entries
+    existing = [h.get("command") for e in entries if isinstance(e, dict) for h in e.get("hooks", []) if isinstance(h, dict)]
+    if cmd not in existing:
+        if not entries or not isinstance(entries[0], dict):
+            entries.insert(0, {"hooks": []})
+        entries[0].setdefault("hooks", []).append({"type": "command", "command": cmd, "timeout": timeout})
 
-import os
-home = os.environ.get("HOME", "~")
+home = os.path.expanduser("~")
 ensure_hook("Stop",         f"{home}/.claude/hooks/session-stop.sh",          10)
 ensure_hook("SessionStart", f"{home}/.claude/hooks/session-start-context.sh",  5)
 

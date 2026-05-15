@@ -299,6 +299,16 @@ if [ -n "$PRECOMMIT_YAML" ] && [ -f "$PRECOMMIT_YAML" ]; then
     warn ".pre-commit-config.yaml 이미 존재, 건너뜀"
   fi
 
+  # pyproject.toml — ruff 설정 (Python 스택만, 없을 때만)
+  if [ "$PRECOMMIT_YAML" = "$TEMPLATE_DIR/django/.pre-commit-config.yaml" ]; then
+    if [ ! -f "$TARGET_DIR/pyproject.toml" ]; then
+      cp "$TEMPLATE_DIR/django/pyproject.toml" "$TARGET_DIR/pyproject.toml"
+      success "pyproject.toml 생성 완료 (ruff: E/F/I 규칙, black-compatible)"
+    else
+      warn "pyproject.toml 이미 존재, 건너뜀"
+    fi
+  fi
+
   # pre-commit 설치 확인 및 자동 설치 (brew → pipx → pip 순으로 시도)
   if ! command -v pre-commit &>/dev/null; then
     info "pre-commit 미설치 — 설치 시도 중..."
@@ -462,6 +472,7 @@ echo "  생성된 파일:"
 echo "  ├── CLAUDE.md"
 echo "  ├── .gitignore"
 echo "  ├── .pre-commit-config.yaml   (python: ruff / js: prettier+eslint)"
+echo "  ├── pyproject.toml            (python only: ruff E/F/I + black-compatible format)"
 echo "  ├── .claude/tasks/"
 echo "  ├── .claude/decisions/"
 echo "  ├── .claude/skills/          (explore/implement/debug/review/autopilot + orchestrator)"

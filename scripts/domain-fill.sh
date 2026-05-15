@@ -36,6 +36,7 @@ APPS=$(find "$TARGET_DIR" -name "models.py" \
 
 if [ -z "$APPS" ]; then
   # non-Django Python 프로젝트 — .py 파일 전체를 대상으로 generic 분석
+  TARGET_DIR="${TARGET_DIR%/}"
   ROOT_DOMAIN="$TARGET_DIR/DOMAIN.md"
   if [ ! -f "$ROOT_DOMAIN" ]; then
     warn "DOMAIN.md 없음 — domain-init.sh 먼저 실행하세요"
@@ -44,9 +45,10 @@ if [ -z "$APPS" ]; then
 
   PY_FILES=$(find "$TARGET_DIR" -name "*.py" \
     ! -path "*/.venv/*" ! -path "*/venv/*" ! -path "*/env/*" \
-    ! -path "*/__pycache__/*" ! -path "*/.git/*" \
-    ! -path "*/migrations/*" ! -name "test_*.py" ! -name "*_test.py" \
-    2>/dev/null | sort | head -30)
+    ! -path "*/__pycache__/*" ! -path "*/.git/*" ! -path "*/node_modules/*" \
+    ! -path "*/migrations/*" ! -path "*/tests/*" \
+    ! -name "test_*.py" ! -name "*_test.py" ! -name "conftest.py" \
+    2>/dev/null | sort | head -100)
 
   if [ -z "$PY_FILES" ]; then
     warn "분석할 .py 파일이 없습니다. 건너뜁니다."

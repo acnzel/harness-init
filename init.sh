@@ -394,7 +394,7 @@ if ! IS_JS_ENV && [ -n "$EXISTING_MODELS" ]; then
 elif IS_PYTHON_ENV; then
   # non-Django Python 프로젝트 — 기본 템플릿 복사 후 domain-fill로 채우기
   if [ ! -f "$TARGET_DIR/DOMAIN.md" ]; then
-    sed "s/{project_name}/$(basename "$TARGET_DIR")/" \
+    sed "s|{project_name}|${PROJECT_NAME//&/\\&}|g" \
       "$TEMPLATE_DIR/django/DOMAIN.md" > "$TARGET_DIR/DOMAIN.md"
     success "DOMAIN.md 기본 템플릿 생성 완료"
   fi

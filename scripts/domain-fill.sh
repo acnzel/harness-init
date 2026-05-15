@@ -35,7 +35,63 @@ APPS=$(find "$TARGET_DIR" -name "models.py" \
   2>/dev/null)
 
 if [ -z "$APPS" ]; then
-  warn "models.py를 가진 Django 앱이 없습니다. 건너뜁니다."
+  # non-Django Python 프로젝트 — .py 파일 전체를 대상으로 generic 분석
+  TARGET_DIR="${TARGET_DIR%/}"
+  ROOT_DOMAIN="$TARGET_DIR/DOMAIN.md"
+  if [ ! -f "$ROOT_DOMAIN" ]; then
+    warn "DOMAIN.md 없음 — domain-init.sh 먼저 실행하세요"
+    exit 0
+  fi
+
+  PY_FILES=$(find "$TARGET_DIR" -name "*.py" \
+    ! -path "*/.venv/*" ! -path "*/venv/*" ! -path "*/env/*" \
+    ! -path "*/__pycache__/*" ! -path "*/.git/*" ! -path "*/node_modules/*" \
+    ! -path "*/migrations/*" ! -path "*/tests/*" \
+    ! -name "test_*.py" ! -name "*_test.py" ! -name "conftest.py" \
+    2>/dev/null | sort | head -100)
+
+  if [ -z "$PY_FILES" ]; then
+    warn "분석할 .py 파일이 없습니다. 건너뜁니다."
+    exit 0
+  fi
+
+  PY_COUNT=$(echo "$PY_FILES" | wc -l | tr -d ' ')
+  info "non-Django Python 프로젝트 감지 — .py ${PY_COUNT}개 파일로 DOMAIN.md 채우기 시작"
+
+  GENERIC_PROMPT="You are filling in a DOMAIN.md for a Python project (non-Django) at the current directory.
+
+Step 1: Read 'DOMAIN.md' to understand its current structure.
+Step 2: Read the following Python source files to understand the project's domain:
+$(echo "$PY_FILES" | while IFS= read -r f; do echo "  - ${f#$TARGET_DIR/}"; done)
+
+Step 3: Fill in ALL sections that contain <!-- TODO --> or 'TODO' placeholders using ONLY information found in the source files:
+
+## 도메인 계층 구조
+- Draw a text tree showing the main module/class hierarchy.
+- Top-level modules at the top, sub-modules/classes indented below.
+
+## 핵심 모델 (또는 핵심 클래스)
+- For EACH main class or data structure, write a markdown table: | 속성/메서드 | 타입 | 설명 |
+- Focus on public attributes and key methods.
+
+## 상태 코드 / Enum
+- Find ALL Enum, IntEnum, StrEnum, or constant definitions.
+- For each: name, table of (값, 의미).
+
+## 주요 관계
+- List dependencies and interactions between modules/classes as bullet points.
+
+Rules:
+- Extract ONLY from actual code. Do not invent fields or relationships.
+- For sections not inferable from code, write 'TODO'.
+- Preserve all existing Markdown headings and structure.
+- Write the updated content directly to 'DOMAIN.md'."
+
+  if (cd "$TARGET_DIR" && claude --dangerously-skip-permissions -p "$GENERIC_PROMPT" </dev/null); then
+    success "DOMAIN.md 자동 채우기 완료 (non-Django)"
+  else
+    warn "DOMAIN.md 채우기 실패 — 수동으로 채우거나 재실행하세요"
+  fi
   exit 0
 fi
 

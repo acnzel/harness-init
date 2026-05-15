@@ -391,11 +391,14 @@ if ! IS_JS_ENV && [ -n "$EXISTING_MODELS" ]; then
 
   # Claude Code로 스켈레톤을 실제 코드 내용으로 채운다
   bash "$SCRIPT_DIR/scripts/domain-fill.sh" "$TARGET_DIR"
-elif IS_PYTHON_ENV && [ ! -f "$TARGET_DIR/DOMAIN.md" ]; then
-  # models.py 없는 Python 프로젝트 — 기본 템플릿 복사
-  sed "s/{project_name}/$(basename "$TARGET_DIR")/" \
-    "$TEMPLATE_DIR/django/DOMAIN.md" > "$TARGET_DIR/DOMAIN.md"
-  success "DOMAIN.md 기본 템플릿 생성 완료 (TODO 항목 채우기 필요)"
+elif IS_PYTHON_ENV; then
+  # non-Django Python 프로젝트 — 기본 템플릿 복사 후 domain-fill로 채우기
+  if [ ! -f "$TARGET_DIR/DOMAIN.md" ]; then
+    sed "s|{project_name}|${PROJECT_NAME//&/\\&}|g" \
+      "$TEMPLATE_DIR/django/DOMAIN.md" > "$TARGET_DIR/DOMAIN.md"
+    success "DOMAIN.md 기본 템플릿 생성 완료"
+  fi
+  bash "$SCRIPT_DIR/scripts/domain-fill.sh" "$TARGET_DIR"
 fi
 
 # ── 전역 자기강화 루프 설정 (~/.claude) ────────────────

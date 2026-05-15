@@ -303,7 +303,7 @@ if [ -n "$PRECOMMIT_YAML" ] && [ -f "$PRECOMMIT_YAML" ]; then
   # pyproject.toml — ruff 설정 (Python 스택만, 없을 때만)
   if [ "$PRECOMMIT_YAML" = "$TEMPLATE_DIR/django/.pre-commit-config.yaml" ]; then
     if [ ! -f "$TARGET_DIR/pyproject.toml" ]; then
-      cp "$TEMPLATE_DIR/django/pyproject.toml" "$TARGET_DIR/pyproject.toml"
+      sed "s/{{PROJECT_NAME}}/$PROJECT_NAME/g" "$TEMPLATE_DIR/django/pyproject.toml" > "$TARGET_DIR/pyproject.toml"
       success "pyproject.toml 생성 완료 (ruff: E/F/I 규칙, black-compatible)"
     else
       warn "pyproject.toml 이미 존재, 건너뜀"

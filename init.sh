@@ -97,6 +97,13 @@ if [ -d "$TEMPLATE_DIR/django/.claude/hooks" ]; then
   success "hooks 설치 완료"
 fi
 
+# rules 복사 (CLAUDE.md @imports 참조 대상)
+if [ -d "$TEMPLATE_DIR/django/.claude/rules" ]; then
+  mkdir -p "$TARGET_DIR/.claude/rules"
+  cp -rn "$TEMPLATE_DIR/django/.claude/rules/"* "$TARGET_DIR/.claude/rules/" 2>/dev/null || true
+  success "rules 설치 완료"
+fi
+
 # project debrief-guardrails 생성 (없을 때만, 스택 무관)
 PROJECT_NAME=$(basename "$TARGET_DIR")
 if [ ! -f "$TARGET_DIR/.claude/debrief-guardrails.md" ]; then
@@ -120,6 +127,59 @@ if [ ! -f "$TARGET_DIR/.claude/settings.json" ]; then
 else
   warn ".claude/settings.json 이미 존재, 건너뜀"
 fi
+
+# ── LSP 설정 주입 ────────────────────────────────────────
+# 언어에 따라 settings.json에 LSP 서버 설정 추가 (이미 lsp 키가 있으면 건너뜀)
+SETTINGS_FILE="$TARGET_DIR/.claude/settings.json"
+_inject_lsp_python() {
+  python3 - "$SETTINGS_FILE" << 'PYEOF'
+import json, sys
+path = sys.argv[1]
+with open(path) as f:
+    s = json.load(f)
+if "lsp" not in s:
+    s["lsp"] = {"python": {"command": "pylsp"}}
+    with open(path, "w") as f:
+        json.dump(s, f, indent=2, ensure_ascii=False)
+PYEOF
+}
+_inject_lsp_js() {
+  python3 - "$SETTINGS_FILE" << 'PYEOF'
+import json, sys
+path = sys.argv[1]
+with open(path) as f:
+    s = json.load(f)
+if "lsp" not in s:
+    s["lsp"] = {
+        "typescript": {"command": "typescript-language-server", "args": ["--stdio"]},
+        "javascript": {"command": "typescript-language-server", "args": ["--stdio"]}
+    }
+    with open(path, "w") as f:
+        json.dump(s, f, indent=2, ensure_ascii=False)
+PYEOF
+}
+
+case "$ENV_TYPE" in
+  python)
+    _inject_lsp_python && success "LSP 설정 완료 (Python: pylsp)"
+    ;;
+  js)
+    _inject_lsp_js && success "LSP 설정 완료 (JS/TS: typescript-language-server)"
+    ;;
+  auto)
+    case "$STACK" in
+      django|fastapi|flask)
+        _inject_lsp_python && success "LSP 설정 완료 (Python: pylsp)"
+        ;;
+      nextjs|nestjs|express|node)
+        _inject_lsp_js && success "LSP 설정 완료 (JS/TS: typescript-language-server)"
+        ;;
+      *)
+        warn "LSP: 스택을 인식하지 못해 LSP 설정을 건너뜁니다 (수동으로 settings.json에 추가하세요)"
+        ;;
+    esac
+    ;;
+esac
 
 # Atlassian MCP 설정 주입
 if [ "$USE_ATLASSIAN_MCP" = "yes" ]; then
@@ -404,7 +464,8 @@ echo "  ├── .claude/decisions/"
 echo "  ├── .claude/skills/          (explore/implement/debug/review/autopilot + orchestrator)"
 echo "  ├── .claude/agents/          (analyst/architect/coder/tester/reviewer)"
 echo "  ├── .claude/commands/        (/review, /workflows:gemini-review 슬래시 커맨드)"
-echo "  ├── .claude/hooks/           (domain-update-reminder.sh, insight-collector.sh — PostToolUse)"
+echo "  ├── .claude/hooks/           (pre-bash-guard.sh — PreToolUse / domain-update-reminder.sh, insight-collector.sh, notification.sh — PostToolUse·Notification)"
+echo "  ├── .claude/rules/           (architecture / testing / domain / agents / hooks — CLAUDE.md @imports)"
 echo "  ├── .claude/settings.json"
 echo "  ├── .gemini/                 (Gemini Code Assist 설정)"
 echo "  ├── .github/                 (이슈 템플릿, PR 템플릿, 워크플로우)"

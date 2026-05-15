@@ -6,7 +6,8 @@ TITLE="${NOTIFICATION_TITLE:-Claude Code}"
 MSG="${NOTIFICATION_MESSAGE:-작업이 완료되었습니다}"
 
 if command -v osascript &>/dev/null; then
-  osascript -e "display notification \"$MSG\" with title \"$TITLE\" sound name \"Glass\"" 2>/dev/null || true
+  export MSG TITLE
+  osascript -e 'display notification (system attribute "MSG") with title (system attribute "TITLE") sound name "Glass"' 2>/dev/null || true
 elif command -v notify-send &>/dev/null; then
   notify-send "$TITLE" "$MSG" 2>/dev/null || true
 else

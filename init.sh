@@ -137,10 +137,11 @@ import json, sys
 path = sys.argv[1]
 with open(path) as f:
     s = json.load(f)
-if "lsp" not in s:
-    s["lsp"] = {"python": {"command": "pylsp"}}
+if "python" not in s.setdefault("lsp", {}):
+    s["lsp"]["python"] = {"command": "pylsp"}
     with open(path, "w") as f:
         json.dump(s, f, indent=2, ensure_ascii=False)
+        f.write("\n")
 PYEOF
 }
 _inject_lsp_js() {
@@ -149,13 +150,15 @@ import json, sys
 path = sys.argv[1]
 with open(path) as f:
     s = json.load(f)
-if "lsp" not in s:
-    s["lsp"] = {
+lsp = s.setdefault("lsp", {})
+if "typescript" not in lsp or "javascript" not in lsp:
+    lsp.update({
         "typescript": {"command": "typescript-language-server", "args": ["--stdio"]},
         "javascript": {"command": "typescript-language-server", "args": ["--stdio"]}
-    }
+    })
     with open(path, "w") as f:
         json.dump(s, f, indent=2, ensure_ascii=False)
+        f.write("\n")
 PYEOF
 }
 

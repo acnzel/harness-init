@@ -29,7 +29,7 @@ if echo "$CMD" | grep -qiE "(DROP TABLE|TRUNCATE TABLE)"; then
 fi
 
 # WHERE 없는 DELETE 경고
-if echo "$CMD" | grep -qiE "DELETE FROM [a-zA-Z_]+" && ! echo "$CMD" | grep -qi "WHERE"; then
+if echo "$CMD" | grep -qiE "DELETE[[:space:]]+FROM[[:space:]]+[a-zA-Z_]+" && ! echo "$CMD" | grep -qi -w "WHERE"; then
   echo ""
   echo "⚠️  WHERE 절 없는 DELETE 감지 — 테이블 전체 삭제 위험"
   echo ""

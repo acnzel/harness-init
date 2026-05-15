@@ -137,6 +137,69 @@ for item in items:
 [DEV-1234] test: 경계값 테스트 케이스 추가
 ```
 
+## KISS / YAGNI / DRY — 리뷰 원칙
+
+Gemini는 아래 원칙에 따라 **과도한 추상화 제안을 자제**해야 합니다.
+
+### 제안하지 말아야 할 것 (SKIP)
+
+| 원칙 | 금지 패턴 | 이유 |
+|------|-----------|------|
+| **YAGNI** | 1곳에서만 쓰이는 코드에 추상화 추가 | 미래 대비 설계는 지금 필요하지 않음 |
+| **YAGNI** | 아직 없는 Factory/Helper 클래스 신규 생성 요구 | 2곳 이상 사용될 때 분리 |
+| **YAGNI** | "나중에 필요할 수도 있으니" 방어 설계 제안 | 현재 요구사항만 구현 |
+| **KISS** | 단순한 코드를 복잡하게 만드는 리팩토링 제안 | 50줄짜리를 100줄로 만들면 퇴보 |
+| **KISS** | 가능한 시나리오가 없는 에러 핸들링 추가 | 불필요한 방어 코드 금지 |
+| **DRY** | 중복 제거가 오히려 복잡성을 높이는 경우 | KISS 우선 |
+
+### 헬퍼 클래스 / 상수 분리 기준 (LOW Priority)
+
+헬퍼 클래스나 상수는 **2곳 이상에서 사용될 때** 별도 파일로 분리합니다.
+단일 View/Serializer에서만 사용되면 같은 파일에 두어도 됩니다.
+
+```python
+# 단일 파일에서만 사용 → 분리 불필요 (YAGNI)
+class ErrorCode:
+    INVALID = "INVALID"
+    NOT_FOUND = "NOT_FOUND"
+
+# 여러 파일에서 사용 → constants.py로 분리 (DRY)
+# from {app}.constants import ErrorCode
+```
+
+### 기존 코드 재사용 확인 (HIGH Priority)
+
+새 함수를 제안하기 전 **기존 코드베이스에 유사한 기능이 있는지 확인**하세요.
+이미 존재하는 유틸리티를 재발명하는 코드는 반드시 지적해야 합니다.
+
+```python
+# BAD - 이미 존재하는 기능을 새로 구현
+def to_korean_time(dt):
+    return dt + timedelta(hours=9)
+
+# GOOD - 기존 유틸리티 재사용
+from plab.utils import to_kst
+```
+
+### QuerySet 최적화 (HIGH Priority)
+
+```python
+# BAD - N+1 쿼리
+for item in items:
+    print(item.user.name)  # 매번 쿼리
+
+# GOOD - select_related
+items = Item.objects.select_related("user").all()
+
+# BAD - 불필요한 전체 조회
+if len(Item.objects.filter(status="active")) > 0:
+
+# GOOD - exists()
+if Item.objects.filter(status="active").exists():
+```
+
+---
+
 ## 리뷰 코멘트 레벨
 
 | 레벨 | 설명 |

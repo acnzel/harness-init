@@ -1,18 +1,40 @@
 have_fun: false
-memory_config:
-  disabled: false
+
 code_review:
   disable: false
   comment_severity_threshold: MEDIUM
-  max_review_comments: 10
+  max_review_comments: 15
   pull_request_opened:
-    help: false
     summary: true
     code_review: true
-    include_drafts: false
+
 ignore_patterns:
-  - "docs/**"
-  - "*.md"
-  - "migrations/**"
-  - ".github/**"
-  - "requirements/**"
+  # Python 자동 생성
+  - "**/migrations/**"
+  - "**/__pycache__/**"
+  - "**/*.pyc"
+  - "**/venv/**"
+  - "**/.pytest_cache/**"
+  - "**/htmlcov/**"
+  - "**/.coverage"
+
+  # 의존성 / 빌드
+  - "**/node_modules/**"
+  - "**/package-lock.json"
+  - "**/yarn.lock"
+
+  # IDE / 에디터
+  - "**/.idea/**"
+  - "**/.vscode/**"
+  - "**/.DS_Store"
+
+  # 문서 / AI 설정 (리뷰 불필요)
+  - "**/docs/**"
+  - "**/.gemini/**"
+  - "**/.claude/**"
+  - "**/CLAUDE.md"
+  - "**/AGENTS.md"
+
+  # 데이터 / 덤프
+  - "**/*.sql"
+  - "**/*.gz"

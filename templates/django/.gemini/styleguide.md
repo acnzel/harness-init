@@ -36,8 +36,8 @@ item = Item.objects.create(status="active")  # 금지!
 커밋 전 반드시 통과해야 하는 검사:
 
 ```bash
-isort --profile black
-black
+ruff check --fix   # E/F 린트 + I(isort) import 정렬
+ruff format        # black-compatible 포매터
 mypy --strict
 ```
 

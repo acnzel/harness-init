@@ -241,6 +241,7 @@ fi
 
 # DOMAIN.md 복사 (JS: 정적 템플릿 / Python: domain-init.sh가 동적 생성)
 IS_JS_ENV() { [ "$ENV_TYPE" = "js" ] || { [ "$ENV_TYPE" = "auto" ] && [[ "$STACK" =~ ^(nextjs|nestjs|express|node)$ ]]; }; }
+IS_PYTHON_ENV() { [ "$ENV_TYPE" = "python" ] || { [ "$ENV_TYPE" = "auto" ] && [[ "$STACK" =~ ^(django|fastapi|flask)$ ]]; }; }
 if IS_JS_ENV; then
   if [ ! -f "$TARGET_DIR/DOMAIN.md" ]; then
     cp "$TEMPLATE_DIR/js/DOMAIN.md" "$TARGET_DIR/DOMAIN.md"
@@ -297,6 +298,16 @@ if [ -n "$PRECOMMIT_YAML" ] && [ -f "$PRECOMMIT_YAML" ]; then
     success ".pre-commit-config.yaml 생성 완료"
   else
     warn ".pre-commit-config.yaml 이미 존재, 건너뜀"
+  fi
+
+  # pyproject.toml — ruff 설정 (Python 스택만, 없을 때만)
+  if [ "$PRECOMMIT_YAML" = "$TEMPLATE_DIR/django/.pre-commit-config.yaml" ]; then
+    if [ ! -f "$TARGET_DIR/pyproject.toml" ]; then
+      sed "s/{{PROJECT_NAME}}/$PROJECT_NAME/g" "$TEMPLATE_DIR/django/pyproject.toml" > "$TARGET_DIR/pyproject.toml"
+      success "pyproject.toml 생성 완료 (ruff: E/F/I 규칙, black-compatible)"
+    else
+      warn "pyproject.toml 이미 존재, 건너뜀"
+    fi
   fi
 
   # pre-commit 설치 확인 및 자동 설치 (brew → pipx → pip 순으로 시도)
@@ -375,11 +386,16 @@ EXISTING_MODELS=$(find "$TARGET_DIR" -name "models.py" \
   2>/dev/null | head -1)
 
 if ! IS_JS_ENV && [ -n "$EXISTING_MODELS" ]; then
-  info "기존 Django 앱 감지 — DOMAIN.md 스켈레톤 생성 중..."
+  info "기존 Python 앱 감지 — DOMAIN.md 스켈레톤 생성 중..."
   bash "$SCRIPT_DIR/scripts/domain-init.sh" "$TARGET_DIR"
 
   # Claude Code로 스켈레톤을 실제 코드 내용으로 채운다
   bash "$SCRIPT_DIR/scripts/domain-fill.sh" "$TARGET_DIR"
+elif IS_PYTHON_ENV && [ ! -f "$TARGET_DIR/DOMAIN.md" ]; then
+  # models.py 없는 Python 프로젝트 — 기본 템플릿 복사
+  sed "s/{project_name}/$(basename "$TARGET_DIR")/" \
+    "$TEMPLATE_DIR/django/DOMAIN.md" > "$TARGET_DIR/DOMAIN.md"
+  success "DOMAIN.md 기본 템플릿 생성 완료 (TODO 항목 채우기 필요)"
 fi
 
 # ── 전역 자기강화 루프 설정 (~/.claude) ────────────────
@@ -462,6 +478,7 @@ echo "  생성된 파일:"
 echo "  ├── CLAUDE.md"
 echo "  ├── .gitignore"
 echo "  ├── .pre-commit-config.yaml   (python: ruff / js: prettier+eslint)"
+echo "  ├── pyproject.toml            (python only: ruff E/F/I + black-compatible format)"
 echo "  ├── .claude/tasks/"
 echo "  ├── .claude/decisions/"
 echo "  ├── .claude/skills/          (explore/implement/debug/review/autopilot + orchestrator)"
@@ -476,7 +493,9 @@ echo "  ├── docs/DOC-SYNC-POLICY.md  (문서 동기화 정책)"
   if IS_JS_ENV; then
     echo "  └── DOMAIN.md  (JS 템플릿 — TODO 항목 채우기 필요)"
   elif [ -n "$EXISTING_MODELS" ]; then
-    echo "  └── DOMAIN.md + 앱별 DOMAIN.md  (기존 Django 프로젝트 — TODO 항목 채우기 필요)"
+    echo "  └── DOMAIN.md + 앱별 DOMAIN.md  (기존 Python 프로젝트 — TODO 항목 채우기 필요)"
+  elif IS_PYTHON_ENV; then
+    echo "  └── DOMAIN.md  (Python 기본 템플릿 — TODO 항목 채우기 필요)"
   else
     echo "  └── (DOMAIN.md: 신규 프로젝트 — 앱 개발 후 domain-init.sh 실행)"
   fi

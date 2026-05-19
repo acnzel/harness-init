@@ -1,0 +1,88 @@
+# claude - 로컬 전용 임시 파일
+.claude/local/
+.claude/settings.local.json
+
+# harness-init 백업 파일
+CLAUDE.md.bak.*
+
+# orchestrator 에이전트 산출물 (로컬 작업 디렉토리)
+_workspace/
+_workspace_*/
+
+# orchestrator compounding 리뷰 문서 (로컬 전용)
+reviews/
+
+# Claude Code worktrees
+.worktrees/
+worktrees/
+
+# AI 도구 개인 설정
+.cursor
+.cursorrules
+.serena/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp
+.pnp.js
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+
+# Build output
+dist/
+build/
+out/
+.output/
+
+# Next.js
+.next/
+next-env.d.ts
+
+# NestJS / TypeScript
+*.js.map
+*.d.ts.map
+tsconfig.tsbuildinfo
+
+# Nuxt.js
+.nuxt/
+.nitro/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Cache
+.eslintcache
+.stylelintcache
+.cache/
+.parcel-cache/
+
+# IDE
+.idea/
+.vscode/
+
+# macOS
+.DS_Store
+._*
+
+# 다이어그램 / 생성 이미지
+*.puml
+docs/*.png
+
+# SQL 덤프
+*.sql
+
+# REST Client (VS Code extension)
+*.http

@@ -188,6 +188,13 @@ migrate_skills() {
   success "skills"
 }
 
+migrate_commands() {
+  local dir="$TARGET_DIR/.claude/commands"
+  [ -d "$dir" ] || { warn ".claude/commands 없음, 건너뜀"; return; }
+  find "$dir" -name "*.md" | while read -r f; do replace_in_file "$f"; done
+  success "commands"
+}
+
 migrate_pr_test() {
   local f="$TARGET_DIR/.github/workflows/pr-test.yml"
   [ -f "$f" ] || { warn "pr-test.yml 없음, 건너뜀"; return; }
@@ -325,6 +332,7 @@ info "$STACK_LABEL 기준으로 harness 마이그레이션 시작..."
 migrate_claude_md
 migrate_agents
 migrate_skills
+migrate_commands
 migrate_pr_test
 migrate_settings
 

@@ -253,7 +253,11 @@ fi
 
 # ── .gitignore 업데이트 ────────────────────────────────
 GITIGNORE="$TARGET_DIR/.gitignore"
-APPEND_FILE="$TEMPLATE_DIR/django/.gitignore.append"
+if IS_JS_ENV && [ -f "$TEMPLATE_DIR/js/.gitignore.append" ]; then
+  APPEND_FILE="$TEMPLATE_DIR/js/.gitignore.append"
+else
+  APPEND_FILE="$TEMPLATE_DIR/django/.gitignore.append"
+fi
 
 if [ -f "$GITIGNORE" ]; then
   if ! grep -q ".claude/local/" "$GITIGNORE"; then
@@ -378,6 +382,37 @@ if IS_JS_ENV; then
   if [ -f "$TEMPLATE_DIR/js/CLAUDE.md" ]; then
     cp -f "$TEMPLATE_DIR/js/CLAUDE.md" "$TARGET_DIR/CLAUDE.md"
     success "JS CLAUDE.md 적용 완료"
+  fi
+
+  # pyproject.toml 제거 (Python 전용 — JS 프로젝트에 불필요)
+  rm -f "$TARGET_DIR/pyproject.toml"
+  success "pyproject.toml 제거 완료"
+
+  # domain-sync.yml 오버라이드 (models.py → entity/schema 감지)
+  if [ -f "$TEMPLATE_DIR/js/.github/workflows/domain-sync.yml" ]; then
+    cp -f "$TEMPLATE_DIR/js/.github/workflows/domain-sync.yml" "$TARGET_DIR/.github/workflows/domain-sync.yml"
+    success "JS domain-sync.yml 적용 완료"
+  fi
+
+  # pre-bash-guard.sh 오버라이드 (Django migrate 경고 제거)
+  if [ -f "$TEMPLATE_DIR/js/.claude/hooks/pre-bash-guard.sh" ]; then
+    cp -f "$TEMPLATE_DIR/js/.claude/hooks/pre-bash-guard.sh" "$TARGET_DIR/.claude/hooks/pre-bash-guard.sh"
+    chmod +x "$TARGET_DIR/.claude/hooks/pre-bash-guard.sh"
+    success "JS pre-bash-guard.sh 적용 완료"
+  fi
+
+  # .gemini/styleguide.md 오버라이드 (Django → TypeScript/JS)
+  if [ -f "$TEMPLATE_DIR/js/.gemini/styleguide.md" ]; then
+    mkdir -p "$TARGET_DIR/.gemini"
+    cp -f "$TEMPLATE_DIR/js/.gemini/styleguide.md" "$TARGET_DIR/.gemini/styleguide.md"
+    success "JS Gemini 스타일 가이드 적용 완료"
+  fi
+
+  # docs/DOC-SYNC-POLICY.md 오버라이드 (views.py → controller.ts 매핑)
+  if [ -f "$TEMPLATE_DIR/js/docs/DOC-SYNC-POLICY.md" ]; then
+    mkdir -p "$TARGET_DIR/docs"
+    cp -f "$TEMPLATE_DIR/js/docs/DOC-SYNC-POLICY.md" "$TARGET_DIR/docs/DOC-SYNC-POLICY.md"
+    success "JS DOC-SYNC-POLICY.md 적용 완료"
   fi
 fi
 

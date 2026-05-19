@@ -60,7 +60,7 @@
 | `{app}/views.py` | `docs/api/{app}.md` |
 | `{app}/models.py` | ADR (모델 변경 시) |
 | `{app}/services.py` | 비즈니스 로직 변경이 API 동작에 영향 시 `docs/api/` |
-| `.claude/agents/*.md` | `CLAUDE.md` 하네스 변경 이력 |
+| `.claude/agents/*.md` | `CLAUDE.md` 하네스 섹션 (에이전트 트리거·팀 구성) |
 | `requirements/` | `docs/deployment.md` (의존성 변경 시) |
 | `CLAUDE.md` | — (이 파일 자체가 문서) |
 

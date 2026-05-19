@@ -49,7 +49,3 @@
 @.claude/rules/agents.md
 @.claude/rules/hooks.md
 
-## 하네스 변경 이력
-
-| 날짜 | 변경 내용 | 대상 | 사유 |
-|------|----------|------|------|

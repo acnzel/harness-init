@@ -29,7 +29,7 @@ if [ "$SCHEMA_CHANGED" = true ]; then
   echo "  ✓ enum/status 값이 변경되었나요?"
   echo "  ✓ 엔티티 간 관계(1:N/N:M)가 변경되었나요?"
   echo ""
-  echo "  갱신 대상: DOMAIN.md (핵심 엔티티 · 상태 코드 · 변경 이력)"
+  echo "  갱신 대상: DOMAIN.md (핵심 엔티티 · 상태 코드)"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 fi
 
@@ -46,6 +46,6 @@ if [ "$SERVICE_CHANGED" = true ]; then
   echo "  ✓ 새 API 엔드포인트가 추가되었나요?"
   echo "  ✓ 기존 동작 방식이 변경되었나요?"
   echo ""
-  echo "  갱신 대상: DOMAIN.md (API 계약 · 주요 흐름 · 변경 이력)"
+  echo "  갱신 대상: DOMAIN.md (API 계약 · 주요 흐름)"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 fi

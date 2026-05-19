@@ -62,7 +62,64 @@ fi
 STACK=$(bash "$SCRIPT_DIR/scripts/migration.sh" --detect "$TARGET_DIR")
 info "감지된 스택: $STACK"
 
+IS_UNKNOWN_ENV() { [ "$ENV_TYPE" = "auto" ] && [ "$STACK" = "unknown" ]; }
+
+# ── 스택 미감지 — 최소 하네스(base-project)만 설치 ────
+if IS_UNKNOWN_ENV; then
+  info "스택을 감지할 수 없어 최소 하네스를 설치합니다..."
+  mkdir -p "$TARGET_DIR/.claude/hooks"
+
+  cp -n "$TEMPLATE_DIR/base-project/CLAUDE.md" \
+        "$TARGET_DIR/CLAUDE.md" 2>/dev/null || warn "CLAUDE.md 이미 존재, 건너뜀"
+  cp -n "$TEMPLATE_DIR/base-project/.claude/settings.json" \
+        "$TARGET_DIR/.claude/settings.json" 2>/dev/null || true
+  cp -n "$TEMPLATE_DIR/base-project/.claude/hooks/notification.sh" \
+        "$TARGET_DIR/.claude/hooks/" 2>/dev/null || true
+  cp -n "$TEMPLATE_DIR/base-project/.claude/hooks/insight-collector.sh" \
+        "$TARGET_DIR/.claude/hooks/" 2>/dev/null || true
+  chmod +x "$TARGET_DIR/.claude/hooks/"*.sh 2>/dev/null || true
+
+  # .gitignore (base-project 범용 항목만)
+  _GITIGNORE="$TARGET_DIR/.gitignore"
+  _APPEND="$TEMPLATE_DIR/base-project/.gitignore.append"
+  if [ -f "$_GITIGNORE" ]; then
+    if ! grep -q ".claude/local/" "$_GITIGNORE"; then
+      echo "" >> "$_GITIGNORE"
+      cat "$_APPEND" >> "$_GITIGNORE"
+      success ".gitignore 업데이트 완료 (base-project)"
+    else
+      warn ".gitignore 이미 설정됨, 건너뜀"
+    fi
+  else
+    cp "$_APPEND" "$_GITIGNORE"
+    success ".gitignore 생성 완료 (base-project)"
+  fi
+
+  success "최소 하네스 설치 완료"
+  echo ""
+  echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo -e "${YELLOW} 스택 미감지 — 추가 설정 필요${NC}"
+  echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo ""
+  echo "  설치된 항목:"
+  echo "  ├── CLAUDE.md         (코딩 원칙 — 스택 무관)"
+  echo "  ├── .claude/settings.json"
+  echo "  ├── .claude/hooks/    (notification, insight-collector)"
+  echo "  └── .gitignore"
+  echo ""
+  echo "  다음 중 하나 후 init.sh를 다시 실행하세요:"
+  echo "  ├── package.json 생성   → Next.js / NestJS / Express 감지"
+  echo "  ├── pyproject.toml 생성 → FastAPI / Flask 감지"
+  echo "  ├── manage.py 생성      → Django 감지"
+  echo "  ├── go.mod 생성         → (현재 미지원 — 수동 설정 필요)"
+  echo "  └── ENV_TYPE=python/js bash init.sh  → 명시적 지정"
+  echo ""
+
+  SKIP_FULL_INSTALL=true
+fi
+
 # ── CLAUDE.md 생성/업데이트 ────────────────────────────
+if [ "${SKIP_FULL_INSTALL:-false}" != "true" ]; then
 bash "$SCRIPT_DIR/scripts/merge-claude-md.sh" "$TARGET_DIR" "$TEMPLATE_DIR"
 
 # ── .claude 디렉토리 구조 생성 ─────────────────────────
@@ -442,6 +499,8 @@ elif IS_PYTHON_ENV; then
   fi
   bash "$SCRIPT_DIR/scripts/domain-fill.sh" "$TARGET_DIR"
 fi
+
+fi # SKIP_FULL_INSTALL
 
 # ── 전역 자기강화 루프 설정 (~/.claude) ────────────────
 info "전역 자기강화 루프 설정 중..."

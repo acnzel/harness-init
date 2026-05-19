@@ -27,7 +27,7 @@ if [ "$MODEL_CHANGED" = true ]; then
   echo "  ✓ 상태값(choices/status)이 변경되었나요?"
   echo "  ✓ 모델 간 관계(FK/O2O)가 변경되었나요?"
   echo ""
-  echo "  갱신 대상: {app}/DOMAIN.md (핵심 모델 · 상태 코드 · 변경 이력)"
+  echo "  갱신 대상: {app}/DOMAIN.md (핵심 모델 · 상태 코드)"
   echo "  신규 앱이면: 루트 DOMAIN.md 인덱스 테이블에 행 추가"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 fi
@@ -45,6 +45,6 @@ if [ "$SERVICE_CHANGED" = true ]; then
   echo "  ✓ 새 API 엔드포인트가 추가되었나요?"
   echo "  ✓ 기존 동작 방식이 변경되었나요?"
   echo ""
-  echo "  갱신 대상: {app}/DOMAIN.md (주요 흐름 · 변경 이력)"
+  echo "  갱신 대상: {app}/DOMAIN.md (주요 흐름)"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 fi

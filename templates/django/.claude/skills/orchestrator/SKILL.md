@@ -52,7 +52,7 @@ TeamCreate(
     { name: "architect", agent_type: "architect", model: "opus",
       prompt: "_workspace/01_ticket_analysis.md를 기반으로 Views/Services/Repositories 설계·테스트 전략을 _workspace/02_architecture.md에 작성. 완료 시 coder에게 SendMessage." },
     { name: "coder", agent_type: "coder", model: "opus",
-      prompt: "_workspace/02_architecture.md를 따라 코드 작성. 모델 변경 필요 시 즉시 중단 후 리더에게 보고. 구현 완료 후 해당 앱 DOMAIN.md 변경 이력 갱신. 결과를 _workspace/03_implementation_notes.md에 작성. 완료 시 tester에게 SendMessage." },
+      prompt: "_workspace/02_architecture.md를 따라 코드 작성. 모델 변경 필요 시 즉시 중단 후 리더에게 보고. 구현 완료 후 새 모델·필드·choices 추가 시 해당 앱 DOMAIN.md 관련 섹션 갱신. 결과를 _workspace/03_implementation_notes.md에 작성. 완료 시 tester에게 SendMessage." },
     { name: "tester", agent_type: "tester", model: "opus",
       prompt: "_workspace/02_architecture.md 테스트 전략과 _workspace/03_implementation_notes.md 변경 파일 목록을 기반으로 pytest 작성(Factory + PropertyMock). 결과를 _workspace/04_test_notes.md에 작성. 완료 시 reviewer에게 SendMessage." },
     { name: "reviewer", agent_type: "reviewer", model: "opus",
@@ -79,7 +79,7 @@ TaskCreate(tasks: [
 1. analyst → SendMessage(to: architect)
 2. architect → SendMessage(to: coder)
 3. coder ↔ tester (양방향 생성-검증 루프, 최대 3회)
-   - **루프 완료 직후**: coder가 변경된 앱의 `DOMAIN.md` 변경 이력 업데이트 여부 자체 확인
+   - **루프 완료 직후**: coder가 변경된 앱의 `DOMAIN.md` 관련 섹션 갱신 여부 자체 확인
 4. reviewer → DOMAIN.md 체크리스트 E 포함하여 검증 → PASS 시 리더에게 "PR 제출 가능" 보고
 
 **리뷰 게이트**:

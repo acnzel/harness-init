@@ -361,6 +361,13 @@ if IS_JS_ENV; then
     success "JS hooks 적용 완료"
   fi
 
+  # rules 오버라이드 (Django 아키텍처 규칙 → JS/TS 아키텍처 규칙)
+  if [ -d "$TEMPLATE_DIR/js/.claude/rules" ]; then
+    mkdir -p "$TARGET_DIR/.claude/rules"
+    cp -f "$TEMPLATE_DIR/js/.claude/rules/"* "$TARGET_DIR/.claude/rules/" 2>/dev/null || true
+    success "JS rules 적용 완료"
+  fi
+
   # GitHub Actions 오버라이드 (pytest → npm test)
   if [ -f "$TEMPLATE_DIR/js/.github/workflows/pr-test.yml" ]; then
     cp -f "$TEMPLATE_DIR/js/.github/workflows/pr-test.yml" "$TARGET_DIR/.github/workflows/pr-test.yml"

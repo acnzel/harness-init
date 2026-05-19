@@ -34,7 +34,7 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
           # 라우트/컨트롤러 변경 여부 감지
-          if echo "$CHANGED" | grep -qE "\.(controller|router|route)\.(ts|js)$|route\.ts$|/api/.*route\.ts$"; then
+          if echo "$CHANGED" | grep -qE "(^|/)(.*\.(controller|router|route)\.(ts|js)|route\.ts)$"; then
             echo "has_route_changes=true" >> $GITHUB_OUTPUT
           else
             echo "has_route_changes=false" >> $GITHUB_OUTPUT
@@ -57,7 +57,7 @@ jobs:
             const changedFiles = `${{ steps.changed.outputs.changed_files }}`;
 
             const routeFiles = changedFiles.split('\n')
-              .filter(f => /\.(controller|router|route)\.(ts|js)$/.test(f) || /\/api\/.*route\.ts$/.test(f))
+              .filter(f => /(^|\/)(.*\.(controller|router|route)\.(ts|js)|route\.ts)$/.test(f))
               .map(f => `- \`${f}\``)
               .join('\n');
 

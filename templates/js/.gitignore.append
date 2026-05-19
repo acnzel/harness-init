@@ -21,22 +21,53 @@ worktrees/
 .cursorrules
 .serena/
 
-# Python
-.ruff_cache/
-pyrightconfig.json
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp
+.pnp.js
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+
+# Build output
+dist/
+build/
+out/
+.output/
+
+# Next.js
+.next/
+next-env.d.ts
+
+# NestJS / TypeScript
+*.js.map
+*.d.ts.map
+tsconfig.tsbuildinfo
+
+# Nuxt.js
+.nuxt/
+.nitro/
+
+# Environment variables
 .env
-.venv
-env/
-venv/
-ENV/
-venv.bak/
-htmlcov/
-.coverage
-.coverage.*
-.pytest_cache/
-.mypy_cache/
-.dmypy.json
-poetry.toml
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Cache
+.eslintcache
+.stylelintcache
+.cache/
+.parcel-cache/
 
 # IDE
 .idea/

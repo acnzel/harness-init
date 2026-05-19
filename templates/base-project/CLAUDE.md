@@ -1,6 +1,10 @@
 # CLAUDE.md
 
-{project_name} — Django {version} / {deployment_info}
+{project_name} — {stack} / {deployment_info}
+
+> ⚠️ 이 파일은 스택 미감지 상태에서 설치된 최소 하네스입니다.
+> 스택이 확정된 후 `bash ~/harness-init/init.sh`을 다시 실행하면
+> 스택에 맞는 에이전트·규칙·워크플로우가 보완됩니다.
 
 ## 코딩 원칙
 
@@ -31,21 +35,3 @@
 | 규칙 | 이유 |
 |------|------|
 | `git push --force`, `git reset --hard` 금지 | 이력 손실 위험 |
-
-## 환경 설정
-
-| 환경 | 모듈 | 비고 |
-|------|------|------|
-| local | `{project}.settings.local` | |
-| dev | `{project}.settings.dev` | |
-| prod | `{project}.settings.prod` | |
-| test | `{project}.settings.test` | SQLite 메모리 DB |
-
-## 상세 규칙
-
-@.claude/rules/architecture.md
-@.claude/rules/testing.md
-@.claude/rules/domain.md
-@.claude/rules/agents.md
-@.claude/rules/hooks.md
-

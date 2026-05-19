@@ -1,0 +1,65 @@
+name: DOMAIN.md Auto Sync
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - dev
+      - prod
+
+jobs:
+  domain-sync:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Detect schema/entity changes
+        id: changed
+        run: |
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.merge_commit_sha }}"
+          CHANGED=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+
+          if echo "$CHANGED" | grep -qE '(^|/)(schema\.prisma|.*\.(entity|model|schema)\.(ts|js))$'; then
+            echo "has_schema_changes=true" >> $GITHUB_OUTPUT
+            echo "Changed schema/entity files:"
+            echo "$CHANGED" | grep -E '(^|/)(schema\.prisma|.*\.(entity|model|schema)\.(ts|js))$'
+          else
+            echo "has_schema_changes=false" >> $GITHUB_OUTPUT
+            echo "No schema/entity changes detected — skipping DOMAIN.md sync"
+          fi
+
+      - name: Install Claude Code CLI
+        if: steps.changed.outputs.has_schema_changes == 'true'
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Sync DOMAIN.md with Claude Code
+        if: steps.changed.outputs.has_schema_changes == 'true'
+        run: |
+          GOAL="schema.prisma 또는 *.entity.ts/*.model.ts가 변경된 모듈의 DOMAIN.md 스켈레톤이 없으면 생성하고, 실제 필드·관계·타입으로 채운 뒤, 루트 DOMAIN.md의 모듈 인덱스·Quick Reference·관계 다이어그램을 업데이트할 것. 각 모듈 완료 시 반드시 '✓ {모듈명} DOMAIN.md 완료'를 출력할 것. 코드에 없는 내용은 절대 추가하지 말 것. or stop after 50 turns"
+          claude --dangerously-skip-permissions -p "/goal $GOAL" </dev/null
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+      - name: Commit updated DOMAIN.md files
+        if: steps.changed.outputs.has_schema_changes == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add '**/DOMAIN.md'
+
+          if git diff --staged --quiet; then
+            echo "No DOMAIN.md changes to commit"
+          else
+            git commit -m "docs: DOMAIN.md 자동 업데이트 — PR #${{ github.event.pull_request.number }}"
+            git push
+          fi

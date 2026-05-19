@@ -57,11 +57,11 @@
 
 | 변경된 코드 위치 | 갱신해야 할 문서 |
 |----------------|----------------|
-| `{app}/views.py` | `docs/api/{app}.md` |
-| `{app}/models.py` | ADR (모델 변경 시) |
-| `{app}/services.py` | 비즈니스 로직 변경이 API 동작에 영향 시 `docs/api/` |
+| `{module}/*.controller.ts` | `docs/api/{module}.md` |
+| `{module}/*.entity.ts`, `schema.prisma` | ADR (스키마 변경 시) |
+| `{module}/*.service.ts` | 비즈니스 로직 변경이 API 동작에 영향 시 `docs/api/` |
 | `.claude/agents/*.md` | `CLAUDE.md` 하네스 섹션 (에이전트 트리거·팀 구성) |
-| `requirements/` | `docs/deployment.md` (의존성 변경 시) |
+| `package.json` (dependencies) | `docs/deployment.md` (의존성 변경 시) |
 | `CLAUDE.md` | — (이 파일 자체가 문서) |
 
 ---
@@ -73,9 +73,14 @@
 - **트리거**: `dev` 또는 `prod` 브랜치에 PR이 머지될 때
 - **동작**:
   1. 변경된 파일 목록 분석
-  2. views.py 변경 감지 → API 문서 갱신 PR 자동 생성
-  3. CHANGELOG.md에 머지 요약 자동 추가
+  2. `*.controller.ts` / `*.router.ts` 변경 감지 → API 문서 갱신 이슈 자동 생성
 - **설정**: `.github/workflows/post-merge-docs.yml` 참조
+
+### `domain-sync.yml`
+
+- **트리거**: `dev` 또는 `prod` 브랜치에 PR이 머지될 때
+- **동작**: `schema.prisma` / `*.entity.ts` / `*.model.ts` 변경 감지 → Claude Code로 DOMAIN.md 자동 업데이트
+- **설정**: `.github/workflows/domain-sync.yml` 참조
 
 ---
 

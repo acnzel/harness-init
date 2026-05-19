@@ -21,23 +21,6 @@ worktrees/
 .cursorrules
 .serena/
 
-# Python
-.ruff_cache/
-pyrightconfig.json
-.env
-.venv
-env/
-venv/
-ENV/
-venv.bak/
-htmlcov/
-.coverage
-.coverage.*
-.pytest_cache/
-.mypy_cache/
-.dmypy.json
-poetry.toml
-
 # IDE
 .idea/
 .vscode/
@@ -45,13 +28,3 @@ poetry.toml
 # macOS
 .DS_Store
 ._*
-
-# 다이어그램 / 생성 이미지
-*.puml
-docs/generated/*.png
-
-# SQL 덤프
-*.dump.sql
-
-# REST Client (VS Code extension)
-*.http

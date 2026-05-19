@@ -36,7 +36,7 @@ analyst → architect → coder ⇄ tester → reviewer
 |---------|------|
 | **analyst** | 티켓 분석, 영향 범위 식별, docs/ 및 DOMAIN.md 선행 참조, ADR 확인 |
 | **architect** | Views/Services/Repositories 설계, ADR 생성, docs/ 문서 생성 |
-| **coder** | 레이어드 코드 구현 + 해당 앱 DOMAIN.md 변경 이력 갱신 |
+| **coder** | 레이어드 코드 구현 + 새 모델·필드·choices 추가 시 해당 앱 DOMAIN.md 갱신 |
 | **tester** | Factory/PropertyMock 기반 pytest 작성 |
 | **reviewer** | 레이어 경계·CLAUDE.md 규칙·DOMAIN.md 최신 여부 검증 (PR 게이트) |
 
@@ -140,7 +140,7 @@ my-project/
 │       ├── claude.yml               ← Claude 이슈 처리
 │       ├── pr-auto-fill.yml         ← PR 설명 자동 생성
 │       ├── pr-test.yml              ← PR 테스트 실행
-│       ├── post-merge-docs.yml      ← 머지 후 CHANGELOG 갱신 + API 문서 이슈 생성
+│       ├── post-merge-docs.yml      ← 머지 후 API 문서 갱신 이슈 자동 생성
 │       └── domain-sync.yml          ← 머지 후 models.py 변경 감지 → DOMAIN.md 자동 갱신
 └── docs/
     ├── architecture/             ← 아키텍처 가이드
@@ -371,7 +371,7 @@ bash ~/harness-init/scripts/domain-fill.sh   # Claude Code로 내용 채우기 (
 | 단계 | 에이전트 | 동작 |
 |------|---------|------|
 | 분석 | analyst | 관련 앱 `DOMAIN.md` 선행 참조 |
-| 구현 | coder | 코드 변경 후 변경 이력 + 수정 섹션 갱신 |
+| 구현 | coder | 새 모델·필드·choices 추가 시 관련 섹션 갱신 |
 | 검증 | reviewer | DOMAIN.md 최신 여부 체크 (체크리스트 E) |
 
 ### 앱별 DOMAIN.md 구조
@@ -382,7 +382,6 @@ bash ~/harness-init/scripts/domain-fill.sh   # Claude Code로 내용 채우기 (
 ## 핵심 모델          ← 모델별 필드·타입 테이블 (domain-fill.sh 자동 주입)
 ## 상태 코드 / Choices ← TextChoices/IntegerChoices 자동 추출
 ## 주요 관계          ← FK/M2M/O2O 관계 목록 (domain-fill.sh 자동 추출)
-## 변경 이력          ← coder가 매 작업 후 갱신
 ```
 
 ### 루트 DOMAIN.md 구조
@@ -393,7 +392,6 @@ bash ~/harness-init/scripts/domain-fill.sh   # Claude Code로 내용 채우기 (
 ## Quick Reference    ← 프로젝트 핵심 용어 10개+ (domain-fill.sh 자동 추출)
 ## 슬랭 / 내부 용어  ← 팀 내부 축약어·패턴 (domain-fill.sh 자동 감지)
 ## 핵심 관계 다이어그램 ← 앱 간 크로스 관계 (domain-fill.sh 자동 생성)
-## 변경 이력
 ```
 
 ---
@@ -515,9 +513,11 @@ harness-init/
 │       ├── DOMAIN.md             ← JS ORM 스키마 안내 (Prisma/TypeORM/Mongoose/Drizzle)
 │       ├── .claude/
 │       │   ├── agents/           ← analyst/architect/coder/tester/reviewer (jest 기반)
+│       │   ├── rules/            ← architecture / testing / domain / agents / hooks (JS/TS 전용)
 │       │   └── hooks/            ← domain-update-reminder.sh (schema.prisma/entity.ts 감지)
 │       └── .github/workflows/
-│           └── pr-test.yml       ← Node.js 20 + npm ci + npm test
+│           ├── pr-test.yml               ← Node.js 20 + npm ci + npm test
+│           └── post-merge-docs.yml       ← 머지 후 API 문서 갱신 이슈 자동 생성
 └── scripts/
     ├── domain-init.sh            ← 앱별 DOMAIN.md 스켈레톤 생성
     ├── domain-fill.sh            ← Claude Code로 DOMAIN.md 실제 내용 채우기 + 루트 합성

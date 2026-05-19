@@ -48,10 +48,10 @@ poetry.toml
 
 # 다이어그램 / 생성 이미지
 *.puml
-docs/*.png
+docs/generated/*.png
 
 # SQL 덤프
-*.sql
+*.dump.sql
 
 # REST Client (VS Code extension)
 *.http

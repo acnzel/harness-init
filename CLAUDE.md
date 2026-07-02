@@ -53,7 +53,7 @@ harness-init/
 
 ## 전역 자기강화 루프 (제거됨)
 
-세션 교훈 루프(debrief-guardrails + session 훅)는 사용자 전역의 weekly-retro 체계(debrief를 지식 베이스에 누적 + `/weekly-retro` 승격 게이트)로 대체되어 harness-init 은 더 이상 `~/.claude/`에 파일·훅을 설치하지 않는다. **같은 루프를 두 곳에서 설치하는 기능을 재도입하지 말 것.**
+세션 교훈 루프(debrief-guardrails + session 훅)는 사용자 전역의 weekly-retro 체계(debrief를 지식 베이스에 누적 + `/weekly-retro` 승격 게이트)로 대체되어 harness-init은 더 이상 `~/.claude/`에 파일·훅을 설치하지 않는다. **같은 루프를 두 곳에서 설치하는 기능을 재도입하지 말 것.**
 
 ### settings.json 병합 규칙
 

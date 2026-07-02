@@ -211,7 +211,7 @@ typescript-language-server --version
 
 ## 자기강화 루프 (Self-Reinforcement Loop)
 
-세션 간 교훈 누적 루프(debrief-guardrails + session 훅)는 사용자 전역의 **weekly-retro 체계**(debrief를 지식 베이스에 누적하고 `/weekly-retro` 게이트로 반복 교훈을 `~/.claude/CLAUDE.md`에 승격)로 대체되어, `init.sh`는 더 이상 전역 파일이나 훅을 설치하지 않습니다. 같은 루프를 두 곳에 설치하지 않습니다.
+세션 간 교훈 누적 루프(debrief-guardrails + session 훅)는 사용자 전역의 **weekly-retro 체계**(debrief를 지식 베이스에 누적하고 `/weekly-retro` 게이트로 반복 교훈을 `~/.claude/CLAUDE.md`에 승격)로 대체되어, `init.sh`는 더 이상 전역 파일이나 훅을 설치하지 않습니다. 동일한 루프를 두 곳에서 중복 설치하지 않습니다.
 
 ### Insight 자동 수집
 

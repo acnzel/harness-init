@@ -57,9 +57,9 @@ harness-init/
 
 전역 체계는 규칙 레지스트리 구조다:
 
-- 교훈은 `~/.claude/rules/rules.yaml` 한 곳에 산다. `/weekly-retro`가 승인된 교훈을 **티어**와 함께 기록한다.
+- 교훈은 `~/.claude/rules/rules.yaml` 한 곳에서 관리된다. `/weekly-retro`가 승인된 교훈을 **티어**와 함께 기록한다.
 - 티어는 전달 방식을 정한다 — `deny`(PreToolUse 차단) / `advise`(해당 도구를 쓰는 순간에만 주입, 5분 쿨다운) / `core`(항상 로드, **상한 7개**) / `archive`(보존만).
-- `~/.claude/CLAUDE.md`의 `반복 교훈` 블록은 `core` 티어에서 **자동 생성**된다. 손으로 쓰지 않는다.
+- `~/.claude/CLAUDE.md`의 `반복 교훈` 블록은 `core` 티어에서 **자동 생성**된다. **직접 편집하지 말 것** — `build`가 덮어쓴다.
 - 전달은 `~/.claude/hooks/rules-dispatcher.py`(PreToolUse)가 담당한다.
 
 **harness-init은 이 중 무엇도 설치하지 않는다.** 전역 체계는 `~/.claude` 저장소가 머신 간에 전파하고, harness-init은 프로젝트별 `.claude/` 스캐폴딩만 담당한다. 이 경계를 넘지 말 것 — 넘는 순간 같은 규칙이 두 곳에서 배달된다.

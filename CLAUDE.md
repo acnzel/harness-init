@@ -53,7 +53,16 @@ harness-init/
 
 ## 전역 자기강화 루프 (제거됨)
 
-세션 교훈 루프(debrief-guardrails + session 훅)는 사용자 전역의 weekly-retro 체계(debrief를 지식 베이스에 누적 + `/weekly-retro` 승격 게이트)로 대체되어 harness-init은 더 이상 `~/.claude/`에 파일·훅을 설치하지 않는다. **같은 루프를 두 곳에서 설치하는 기능을 재도입하지 말 것.**
+세션 교훈 루프(debrief-guardrails + session 훅)는 사용자 전역의 weekly-retro 체계로 대체되어 harness-init은 더 이상 `~/.claude/`에 파일·훅을 설치하지 않는다. **같은 루프를 두 곳에서 설치하는 기능을 재도입하지 말 것.**
+
+전역 체계는 2026-07-14에 규칙 레지스트리 구조로 바뀌었다:
+
+- 교훈은 `~/.claude/rules/rules.yaml` 한 곳에 산다. `/weekly-retro`가 승인된 교훈을 **티어**와 함께 기록한다.
+- 티어는 전달 방식을 정한다 — `deny`(PreToolUse 차단) / `advise`(해당 도구를 쓰는 순간에만 주입, 5분 쿨다운) / `core`(항상 로드, **상한 7개**) / `archive`(보존만).
+- `~/.claude/CLAUDE.md`의 `반복 교훈` 블록은 `core` 티어에서 **자동 생성**된다. 손으로 쓰지 않는다.
+- 전달은 `~/.claude/hooks/rules-dispatcher.py`(PreToolUse)가 담당한다.
+
+**harness-init은 이 중 무엇도 설치하지 않는다.** 전역 체계는 `~/.claude` 저장소가 머신 간에 전파하고, harness-init은 프로젝트별 `.claude/` 스캐폴딩만 담당한다. 이 경계를 넘지 말 것 — 넘는 순간 같은 규칙이 두 곳에서 배달된다.
 
 ### settings.json 병합 규칙
 

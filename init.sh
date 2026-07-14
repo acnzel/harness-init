@@ -496,7 +496,9 @@ fi
 fi # SKIP_FULL_INSTALL
 
 # 전역 자기강화 루프(debrief-guardrails + session 훅)는 ~/.claude 전역의 weekly-retro
-# 체계(plab_wiki/debriefs 누적 + /weekly-retro 승격 게이트)로 대체되어 설치하지 않는다.
+# 체계(debrief 누적 + /weekly-retro 승격 게이트 → rules/rules.yaml 규칙 레지스트리 →
+# hooks/rules-dispatcher.py 가 PreToolUse 에서 차단·주입)로 대체되어 설치하지 않는다.
+# 전역 체계는 ~/.claude 저장소가 전파한다. 여기서 규칙 파일·훅을 설치하면 이중 배달이 된다.
 
 # ── 완료 메시지 ────────────────────────────────────────
 echo ""

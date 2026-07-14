@@ -211,7 +211,20 @@ typescript-language-server --version
 
 ## 자기강화 루프 (Self-Reinforcement Loop)
 
-세션 간 교훈 누적 루프(debrief-guardrails + session 훅)는 사용자 전역의 **weekly-retro 체계**(debrief를 지식 베이스에 누적하고 `/weekly-retro` 게이트로 반복 교훈을 `~/.claude/CLAUDE.md`에 승격)로 대체되어, `init.sh`는 더 이상 전역 파일이나 훅을 설치하지 않습니다. 동일한 루프를 두 곳에서 중복 설치하지 않습니다.
+세션 간 교훈 누적 루프(debrief-guardrails + session 훅)는 사용자 전역의 **weekly-retro 체계**로 대체되어, `init.sh`는 더 이상 전역 파일이나 훅을 설치하지 않습니다. 동일한 루프를 두 곳에서 중복 설치하지 않습니다.
+
+전역 체계는 debrief를 지식 베이스에 누적하고, `/weekly-retro` 게이트로 승인된 반복 교훈을 **규칙 레지스트리**(`~/.claude/rules/rules.yaml`)에 티어와 함께 기록합니다. 티어가 전달 방식을 정합니다:
+
+| 티어 | 전달 |
+|---|---|
+| `deny` | 위험한 명령을 PreToolUse 훅이 차단 |
+| `advise` | 해당 도구·명령·파일을 만지는 **그 순간에만** 주입 (규칙별 5분 쿨다운) |
+| `core` | 항상 로드 — `~/.claude/CLAUDE.md`에 자동 생성, **상한 7개** |
+| `archive` | 주입하지 않고 검색용으로만 보존 |
+
+교훈을 전부 항상 로드하면 무관한 규칙이 쌓여 결국 아무것도 지켜지지 않기 때문입니다(희석화). `core` 상한이 있어 새 교훈을 넣으려면 기존 것을 강등해야 합니다.
+
+> **이 체계는 `~/.claude` 저장소가 머신 간에 전파합니다.** 신규 머신을 세팅할 땐 `~/.claude`를 먼저 clone하세요. `harness-init`은 프로젝트별 `.claude/` 스캐폴딩만 담당하며, 전역 규칙 파일이나 훅을 설치하지 않습니다.
 
 ### Insight 자동 수집
 

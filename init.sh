@@ -426,13 +426,6 @@ if IS_JS_ENV; then
     success "JS agents 적용 완료"
   fi
 
-  # hooks 오버라이드 (models.py 감지 → schema/entity 파일 감지)
-  if [ -d "$TEMPLATE_DIR/js/.claude/hooks" ]; then
-    cp -f "$TEMPLATE_DIR/js/.claude/hooks/"* "$TARGET_DIR/.claude/hooks/" 2>/dev/null || true
-    chmod +x "$TARGET_DIR/.claude/hooks/"*.sh 2>/dev/null || true
-    success "JS hooks 적용 완료"
-  fi
-
   # rules 오버라이드 (Django 아키텍처 규칙 → JS/TS 아키텍처 규칙)
   if [ -d "$TEMPLATE_DIR/js/.claude/rules" ]; then
     mkdir -p "$TARGET_DIR/.claude/rules"

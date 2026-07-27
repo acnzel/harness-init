@@ -461,7 +461,12 @@ cp .claude/decisions/adr-template.md .claude/decisions/001-auth-strategy.md
 | Django / FastAPI / Flask | `templates/django/` | pytest + Factory + PropertyMock | ruff + ruff-format + domain-gate | stdlib `ast` (정밀) |
 | Next.js / NestJS / Express | `templates/js/` | jest/vitest + factory functions + jest.spyOn | prettier + eslint + domain-gate | 선언 블록 지문 (TS enum / `as const` / 리터럴 union / Prisma) |
 
-JS/TS 환경은 Django 공통 파일(skills, commands, .gemini, docs)을 그대로 재사용하고, 에이전트·hooks·CLAUDE.md·PR 테스트 워크플로우만 JS 전용으로 교체됩니다.
+JS/TS 환경은 Django 공통 파일(skills, commands, hooks, .gemini, docs)을 그대로 재사용하고,
+에이전트·rules·CLAUDE.md·DOMAIN.md·pre-commit·PR 테스트 워크플로우만 JS 전용으로 교체됩니다.
+(`pre-bash-guard.sh` 만 Django migrate 경고를 뺀 JS 버전으로 바뀝니다.)
+
+훅은 스택 무관입니다. `domain-guard.sh` 가 `domain-gate.py` 에 위임하고, 그 안에서
+확장자에 따라 판정 방식이 갈립니다.
 
 ---
 

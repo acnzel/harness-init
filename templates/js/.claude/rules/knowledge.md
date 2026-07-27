@@ -18,13 +18,16 @@
 codegraph explore "<자연어 질문>"   # 관련 심볼 + 소스 + 호출 경로 + 영향 범위
 codegraph node <심볼>               # 한 심볼의 소스와 호출 관계
 codegraph callers <심볼>            # 누가 호출하나
+codegraph callees <심볼>            # 무엇을 호출하나
 codegraph impact <심볼>             # 이걸 바꾸면 어디가 영향받나
 codegraph affected <파일...>        # 이 파일이 바뀌면 어떤 테스트가 영향받나
+codegraph query <검색어>            # 심볼 이름 검색
 ```
 
 MCP 도구 `codegraph_explore` 로도 같은 결과를 얻는다.
 
 **codegraph가 없으면** Grep/Read로 폴백한다. 하네스는 codegraph 없이도 동작한다.
+`codegraph --version` 이 실패하면 폴백 경로다.
 
 ## 의미 질문 → DOMAIN.md
 

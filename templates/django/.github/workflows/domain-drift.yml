@@ -67,9 +67,14 @@ jobs:
       - name: Comment on PR
         if: steps.gate.outputs.status == 'drift'
         uses: actions/github-script@v7
+        # 게이트 출력은 PR 작성자가 내용을 좌우할 수 있다. Actions 표현식으로 스크립트에
+        # 직접 보간하면 백틱이나 ${ 로 빠져나가 GITHUB_TOKEN 컨텍스트에서 임의 코드가
+        # 실행된다. env 로 넘겨 값으로만 다룬다.
+        env:
+          GATE_REPORT: ${{ steps.gate.outputs.report }}
         with:
           script: |
-            const report = `${{ steps.gate.outputs.report }}`;
+            const report = process.env.GATE_REPORT || '';
             const marker = '<!-- domain-drift-check -->';
             const body = [
               marker,

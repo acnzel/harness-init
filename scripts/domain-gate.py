@@ -156,15 +156,19 @@ def _match_block(source, open_index):
     """
     depth = 0
     quote = None
-    for i in range(open_index, len(source)):
+    i = open_index
+    end = len(source)
+    while i < end:
         ch = source[i]
         if quote:
             if ch == "\\":
+                # 이스케이프된 문자는 통째로 건너뛴다. 한 칸만 넘기면 \" 의 " 를
+                # 문자열 종료로 오인해 이후 중괄호 카운팅이 전부 어긋난다.
+                i += 2
                 continue
             if ch == quote:
                 quote = None
-            continue
-        if ch in "\"'`":
+        elif ch in "\"'`":
             quote = ch
         elif ch == "{":
             depth += 1
@@ -172,7 +176,8 @@ def _match_block(source, open_index):
             depth -= 1
             if depth == 0:
                 return source[open_index + 1 : i], i
-    return None, len(source)
+        i += 1
+    return None, end
 
 
 _JS_ENUM_DECL = re.compile(r"\benum\s+([A-Za-z_$][\w$]*)\s*\{")

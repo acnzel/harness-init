@@ -161,14 +161,19 @@ if [ -d "$TEMPLATE_DIR/django/.claude/rules" ]; then
   success "rules 설치 완료"
 fi
 
-PROJECT_NAME=$(basename "$TARGET_DIR")
-
-# scripts 복사 (domain-sync GitHub Actions에서 참조)
+# 도메인 지식 도구 복사 (.claude/scripts/)
+# 다른 템플릿과 달리 -n 이 아니라 덮어쓴다. 이 셋은 사용자가 편집하는 설정이 아니라
+# 훅·pre-commit·에이전트가 함께 호출하는 하네스 소유 코드라, 버전이 어긋나면
+# 게이트가 조용히 오작동한다. 재실행 시 항상 최신으로 맞춘다.
 mkdir -p "$TARGET_DIR/.claude/scripts"
-cp "$SCRIPT_DIR/scripts/domain-init.sh" "$TARGET_DIR/.claude/scripts/domain-init.sh"
-cp "$SCRIPT_DIR/scripts/domain-fill.sh" "$TARGET_DIR/.claude/scripts/domain-fill.sh"
-chmod +x "$TARGET_DIR/.claude/scripts/"*.sh
-success "scripts 설치 완료"
+cp "$SCRIPT_DIR/scripts/domain-extract.py" \
+   "$SCRIPT_DIR/scripts/domain-gate.py" \
+   "$SCRIPT_DIR/scripts/domain-freshness.py" \
+   "$TARGET_DIR/.claude/scripts/" 2>/dev/null || true
+chmod +x "$TARGET_DIR/.claude/scripts/"*.py 2>/dev/null || true
+success "도메인 지식 도구 설치 완료 (.claude/scripts/ — extract/gate/freshness)"
+
+PROJECT_NAME=$(basename "$TARGET_DIR")
 
 # settings.json (없을 때만 생성)
 if [ ! -f "$TARGET_DIR/.claude/settings.json" ]; then
@@ -355,9 +360,11 @@ if [ -n "$PRECOMMIT_YAML" ] && [ -f "$PRECOMMIT_YAML" ]; then
   fi
 
   # pyproject.toml — ruff 설정 (Python 스택만, 없을 때만)
+  HARNESS_OWNS_PYPROJECT=false
   if [ "$PRECOMMIT_YAML" = "$TEMPLATE_DIR/django/.pre-commit-config.yaml" ]; then
     if [ ! -f "$TARGET_DIR/pyproject.toml" ]; then
       sed "s/{{PROJECT_NAME}}/$PROJECT_NAME/g" "$TEMPLATE_DIR/django/pyproject.toml" > "$TARGET_DIR/pyproject.toml"
+      HARNESS_OWNS_PYPROJECT=true
       success "pyproject.toml 생성 완료 (ruff: E/F/I 규칙, black-compatible)"
     else
       warn "pyproject.toml 이미 존재, 건너뜀"
@@ -389,6 +396,17 @@ if [ -n "$PRECOMMIT_YAML" ] && [ -f "$PRECOMMIT_YAML" ]; then
   else
     warn "git 저장소가 아닙니다. 'git init' 후 'pre-commit install' 수동 실행 필요"
   fi
+
+  # ── lint baseline ──────────────────────────────────
+  # 이미 개발이 진행된 레포에 ruff를 처음 켜면 레거시 위반이 쏟아져 모든 커밋이 막힌다.
+  # 그러면 DOMAIN.md 갱신 커밋도 통과하지 못해 지식 루프 자체가 멈춘다.
+  # 기존 위반을 규칙 단위로 유예해 루프를 살리고, 무엇을 유예했는지는 항상 노출한다.
+  if [ "$HARNESS_OWNS_PYPROJECT" = true ]; then
+    python3 "$SCRIPT_DIR/scripts/lint-baseline.py" "$TARGET_DIR" --apply
+  elif [ -f "$TARGET_DIR/pyproject.toml" ]; then
+    # 기존 pyproject.toml 은 남의 설정이다. 건드리지 않고 보고만 한다.
+    python3 "$SCRIPT_DIR/scripts/lint-baseline.py" "$TARGET_DIR"
+  fi
 fi
 
 # ── 비 Django 스택이면 harness 마이그레이션 ───────────
@@ -406,13 +424,6 @@ if IS_JS_ENV; then
   if [ -d "$TEMPLATE_DIR/js/.claude/agents" ]; then
     cp -rf "$TEMPLATE_DIR/js/.claude/agents/"* "$TARGET_DIR/.claude/agents/" 2>/dev/null || true
     success "JS agents 적용 완료"
-  fi
-
-  # hooks 오버라이드 (models.py 감지 → schema/entity 파일 감지)
-  if [ -d "$TEMPLATE_DIR/js/.claude/hooks" ]; then
-    cp -f "$TEMPLATE_DIR/js/.claude/hooks/"* "$TARGET_DIR/.claude/hooks/" 2>/dev/null || true
-    chmod +x "$TARGET_DIR/.claude/hooks/"*.sh 2>/dev/null || true
-    success "JS hooks 적용 완료"
   fi
 
   # rules 오버라이드 (Django 아키텍처 규칙 → JS/TS 아키텍처 규칙)
@@ -438,11 +449,6 @@ if IS_JS_ENV; then
   rm -f "$TARGET_DIR/pyproject.toml"
   success "pyproject.toml 제거 완료"
 
-  # domain-sync.yml 오버라이드 (models.py → entity/schema 감지)
-  if [ -f "$TEMPLATE_DIR/js/.github/workflows/domain-sync.yml" ]; then
-    cp -f "$TEMPLATE_DIR/js/.github/workflows/domain-sync.yml" "$TARGET_DIR/.github/workflows/domain-sync.yml"
-    success "JS domain-sync.yml 적용 완료"
-  fi
 
   # pre-bash-guard.sh 오버라이드 (Django migrate 경고 제거)
   if [ -f "$TEMPLATE_DIR/js/.claude/hooks/pre-bash-guard.sh" ]; then
@@ -466,8 +472,15 @@ if IS_JS_ENV; then
   fi
 fi
 
-# ── 기존 프로젝트이면 DOMAIN.md 스켈레톤 생성 ──────────
-# models.py 가 마이그레이션 외에 존재하면 기개발 프로젝트로 판단
+# ── 구조 지식 계층 (codegraph) ─────────────────────────
+# 선택 의존성. 없으면 안내만 하고 넘어간다 — 하네스는 codegraph 없이도 동작하고,
+# 에이전트 rules에 Grep/Read 폴백 경로가 명시되어 있다.
+bash "$SCRIPT_DIR/scripts/codegraph-setup.sh" "$TARGET_DIR"
+
+# ── 의미 지식 계층 (DOMAIN.md) ─────────────────────────
+# 구조(모델 목록·필드·관계·호출 경로)는 codegraph가 실시간으로 답하므로 문서화하지 않는다.
+# 여기서는 codegraph가 못 보는 것 — Choices 값, db_table 매핑, 시그널 부수효과 — 만
+# AST로 추출해 스켈레톤을 만든다.
 EXISTING_MODELS=$(find "$TARGET_DIR" -name "models.py" \
   ! -path "*/migrations/*" \
   ! -path "*/.venv/*" \
@@ -477,20 +490,21 @@ EXISTING_MODELS=$(find "$TARGET_DIR" -name "models.py" \
   ! -path "*/.git/*" \
   2>/dev/null | head -1)
 
-if ! IS_JS_ENV && [ -n "$EXISTING_MODELS" ]; then
-  info "기존 Python 앱 감지 — DOMAIN.md 스켈레톤 생성 중..."
+if IS_PYTHON_ENV; then
+  info "의미 지식 스켈레톤 생성 중..."
   bash "$SCRIPT_DIR/scripts/domain-init.sh" "$TARGET_DIR"
 
-  # Claude Code로 스켈레톤을 실제 코드 내용으로 채운다
-  bash "$SCRIPT_DIR/scripts/domain-fill.sh" "$TARGET_DIR"
-elif IS_PYTHON_ENV; then
-  # non-Django Python 프로젝트 — 기본 템플릿 복사 후 domain-fill로 채우기
+  # 앱을 찾지 못했으면(신규 프로젝트 등) 루트에 기본 템플릿만 둔다.
   if [ ! -f "$TARGET_DIR/DOMAIN.md" ]; then
     sed "s|{project_name}|${PROJECT_NAME//&/\\&}|g" \
       "$TEMPLATE_DIR/django/DOMAIN.md" > "$TARGET_DIR/DOMAIN.md"
     success "DOMAIN.md 기본 템플릿 생성 완료"
   fi
-  bash "$SCRIPT_DIR/scripts/domain-fill.sh" "$TARGET_DIR"
+
+  # 시그널 핸들러 본문을 읽어 '무슨 부수효과를 내나' 열만 채운다 (Claude Code 필요).
+  if [ -n "$EXISTING_MODELS" ]; then
+    bash "$SCRIPT_DIR/scripts/domain-fill.sh" "$TARGET_DIR"
+  fi
 fi
 
 fi # SKIP_FULL_INSTALL
@@ -516,21 +530,31 @@ echo "  ├── .claude/decisions/"
 echo "  ├── .claude/skills/          (explore/implement/debug/review/autopilot + orchestrator)"
 echo "  ├── .claude/agents/          (analyst/architect/coder/tester/reviewer)"
 echo "  ├── .claude/commands/        (/review, /workflows:gemini-review 슬래시 커맨드)"
-echo "  ├── .claude/hooks/           (pre-bash-guard.sh — PreToolUse / domain-update-reminder.sh, insight-collector.sh, notification.sh — PostToolUse·Notification)"
-echo "  ├── .claude/rules/           (architecture / testing / domain / agents / hooks — CLAUDE.md @imports)"
+echo "  ├── .claude/hooks/           (session-knowledge — SessionStart / pre-bash-guard — PreToolUse / domain-guard, insight-collector, notification)"
+echo "  ├── .claude/scripts/         (domain-extract / domain-gate / domain-freshness — 의미 지식 도구)"
+echo "  ├── .claude/rules/           (knowledge / architecture / testing / domain / agents / hooks — CLAUDE.md @imports)"
 echo "  ├── .claude/settings.json"
 echo "  ├── .gemini/                 (Gemini Code Assist 설정)"
 echo "  ├── .github/                 (이슈 템플릿, PR 템플릿, 워크플로우)"
 echo "  ├── docs/DOC-SYNC-POLICY.md  (문서 동기화 정책)"
   if IS_JS_ENV; then
-    echo "  └── DOMAIN.md  (JS 템플릿 — TODO 항목 채우기 필요)"
+    echo "  └── DOMAIN.md  (JS 템플릿 — 의미 TODO 채우기 필요)"
   elif [ -n "$EXISTING_MODELS" ]; then
-    echo "  └── DOMAIN.md + 앱별 DOMAIN.md  (기존 Python 프로젝트 — TODO 항목 채우기 필요)"
+    echo "  └── DOMAIN.md + 앱별 DOMAIN.md  (값·위치는 AST로 채워짐 / '의미' TODO는 사람 몫)"
   elif IS_PYTHON_ENV; then
-    echo "  └── DOMAIN.md  (Python 기본 템플릿 — TODO 항목 채우기 필요)"
+    echo "  └── DOMAIN.md  (Python 기본 템플릿 — 의미 TODO 채우기 필요)"
   else
-    echo "  └── (DOMAIN.md: 신규 프로젝트 — 앱 개발 후 domain-init.sh 실행)"
+    echo "  └── (DOMAIN.md: 신규 프로젝트 — 코드 작성 후 domain-init.sh 실행)"
   fi
+echo ""
+echo -e "${BLUE}  지식 계층${NC}"
+echo "  ├── 구조 (어디에 뭐가 있나·뭐가 뭘 부르나)  → codegraph, 실시간 인덱스"
+echo "  └── 의미 (무슨 뜻인가·왜 이런가)            → DOMAIN.md, 게이트가 최신 강제"
+echo ""
+echo -e "${BLUE}  자동 가드레일 3단${NC}"
+echo "  ├── 세션 시작   session-knowledge.sh  인덱스 동기화 + 낡은 문서 경고"
+echo "  ├── 편집 직후   domain-guard.sh       의미 변화 감지 → 갱신 지시 (exit 2)"
+echo "  └── 커밋 직전   domain-gate           문서 미갱신이면 커밋 차단"
 echo ""
 echo "  에이전트 팀 (orchestrator 스킬):"
 echo "  analyst → architect → coder ⇄ tester → reviewer"
@@ -539,7 +563,7 @@ echo "  슬래시 커맨드:"
 echo "  /orchestrator   /review   /explore   /implement   /debug   /autopilot"
 echo ""
 echo "  GitHub Actions:"
-echo "  claude-code-review · claude · pr-auto-fill · pr-test · post-merge-docs · domain-sync"
+echo "  claude-code-review · claude · pr-auto-fill · pr-test · post-merge-docs · domain-drift"
 echo ""
 
 RED='\033[0;31m'
@@ -554,11 +578,10 @@ echo "  ┌───────────────────────
 echo "  │ 시크릿 이름             │ 설명                         │"
 echo "  ├─────────────────────────┼──────────────────────────────┤"
 echo "  │ ANTHROPIC_API_KEY       │ Claude AI API 키             │"
-echo "  │                         │ (domain-sync · claude-code-review · claude 워크플로우) │"
+echo "  │                         │ (claude-code-review · claude 워크플로우)      │"
 echo "  └─────────────────────────┴──────────────────────────────┘"
 echo ""
 echo "  ANTHROPIC_API_KEY 없이는:"
-echo "  · PR 머지 후 DOMAIN.md 자동 갱신 불가 (domain-sync)"
 echo "  · PR 자동 코드 리뷰 불가 (claude-code-review)"
 echo "  · 이슈 자동 처리 불가 (claude)"
 echo ""

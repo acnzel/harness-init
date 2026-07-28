@@ -43,9 +43,21 @@ model: opus
 - [ ] git diff에서 요청과 무관한 파일 수정 없음
 - [ ] 기존 데드코드 삭제 없음
 
-### E. DOMAIN.md 최신 여부
-- [ ] 새 모델·필드·choices 추가 시 해당 앱 `{app}/DOMAIN.md` 관련 섹션 갱신됨
-- [ ] 루트 `DOMAIN.md` 인덱스에 신규 앱이 추가됐으면 행이 추가됨
+### E. 도메인 의미 지식 (게이트 — FAIL 시 PASS 불가)
+
+먼저 기계 판정을 돌린다. 눈으로 훑어 판단하지 않는다.
+
+```bash
+python3 .claude/scripts/domain-gate.py --staged
+```
+
+- [ ] 게이트 종료 코드 0 (의미 변화 없음, 또는 DOMAIN.md 동반 갱신됨)
+- [ ] 게이트가 잡은 항목마다 **값이 아니라 의미**가 적혀 있다
+- [ ] 시그널·훅을 추가했으면 '무슨 부수효과를 내나' 열이 채워져 있다
+- [ ] `--no-verify` 로 우회했다면 구현 노트에 사유가 적혀 있다
+
+**역으로도 본다**: DOMAIN.md에 필드 목록·관계·계층 트리처럼 codegraph가 답할 구조
+정보가 새로 추가됐으면 그것도 지적한다. 낡을 것을 심는 행위다.
 
 ## 입력/출력 프로토콜
 
@@ -67,12 +79,13 @@ model: opus
   - **수정 권고**: `self.service.get_items()` 로 위임
   - **담당**: django-implementer
 
-  ### 🟡 E1. DOMAIN.md 미업데이트 ({app}/DOMAIN.md)
-  - **규칙**: 새 모델·필드·choices 추가 시 해당 앱 DOMAIN.md 관련 섹션 갱신 필수 (CLAUDE.md "하네스 에이전트 팀")
-  - **현재 상태**: 코드 변경 내용이 DOMAIN.md에 반영되지 않음
-  - **수정 권고**: `{app}/DOMAIN.md` 해당 섹션(핵심 모델·상태 코드 등)을 현재 코드에 맞게 갱신
+  ### 🔴 E1. 도메인 의미 지식 미반영 ({app}/DOMAIN.md)
+  - **규칙**: 코드에서 뽑을 수 없는 지식(상태값 의미·시그널 부수효과·db_table)이 바뀌면 같은 커밋에서 DOMAIN.md 갱신 (`.claude/rules/domain.md`)
+  - **판정 근거**: `python3 .claude/scripts/domain-gate.py --staged` 종료 코드 1
+  - **감지 내용**: {게이트 출력의 추가/삭제 항목}
+  - **수정 권고**: 해당 표의 '의미' 열을 채운다
   - **담당**: coder
-  - **심각도**: WARNING (PASS 처리는 하되 coder에게 보완 요청)
+  - **심각도**: BLOCKER — 이 항목이 열려 있으면 PASS 불가
 
   ## PASS 항목 (체크리스트)
 

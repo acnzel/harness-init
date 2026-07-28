@@ -15,16 +15,16 @@ if [ -f "$TARGET_FILE" ]; then
     echo -e "\033[1;33m[harness]\033[0m CLAUDE.md 이미 harness 설정 포함, 건너뜀"
     exit 0
   fi
-  # 기존 파일 백업 (수정 전)
-  BACKUP_FILE="${TARGET_FILE}.bak.$(date +%Y%m%d_%H%M%S)"
-  cp "$TARGET_FILE" "$BACKUP_FILE"
-  echo -e "\033[0;34m[harness]\033[0m 기존 CLAUDE.md 백업: $(basename "$BACKUP_FILE")"
   {
     echo ""
     cat "$TEMPLATE_FILE"
   } >> "$TARGET_FILE"
   echo -e "\033[0;32m[harness]\033[0m ✓ CLAUDE.md 업데이트 완료"
 else
+  # 마커는 템플릿 첫 줄에 들어 있다. 여기서 따로 찍지 않는 이유는 init.sh 가
+  # JS 스택에서 이 파일을 js/CLAUDE.md 로 통째로 덮어쓰기 때문이다. 마커가
+  # 템플릿에 있어야 그 경로에서도 살아남고, 재실행 시 "harness 설정 없음"으로
+  # 판정해 템플릿을 한 번 더 덧붙이는 일이 없다.
   cp "$TEMPLATE_FILE" "$TARGET_FILE"
   echo -e "\033[0;32m[harness]\033[0m ✓ CLAUDE.md 생성 완료"
 fi

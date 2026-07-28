@@ -76,11 +76,11 @@
   2. `*.controller.ts` / `*.router.ts` 변경 감지 → API 문서 갱신 이슈 자동 생성
 - **설정**: `.github/workflows/post-merge-docs.yml` 참조
 
-### `domain-sync.yml`
+### `domain-drift.yml`
 
-- **트리거**: `dev` 또는 `prod` 브랜치에 PR이 머지될 때
-- **동작**: `schema.prisma` / `*.entity.ts` / `*.model.ts` 변경 감지 → Claude Code로 DOMAIN.md 자동 업데이트
-- **설정**: `.github/workflows/domain-sync.yml` 참조
+- **트리거**: PR 생성·갱신 시 (머지 후가 아니라 머지 **전**)
+- **동작**: enum · `as const` · 리터럴 union · Prisma `@@map` 변경 대비 DOMAIN.md 미갱신을 검출해 PR에 코멘트. LLM을 쓰지 않아 비용이 없다
+- **설정**: `.github/workflows/domain-drift.yml` 참조
 
 ---
 

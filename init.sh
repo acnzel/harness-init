@@ -13,6 +13,7 @@ TARGET_DIR="${PWD}"
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+RED='\033[0;31m'
 NC='\033[0m'
 
 info()    { echo -e "${BLUE}[harness]${NC} $1"; }
@@ -244,7 +245,6 @@ if [ "$USE_ATLASSIAN_MCP" = "yes" ]; then
   if ! command -v python3 &>/dev/null; then
     warn "python3가 설치되어 있지 않아 Atlassian MCP 설정을 주입할 수 없습니다. 수동으로 설정해 주세요."
   else
-    SETTINGS_FILE="$TARGET_DIR/.claude/settings.json"
     python3 - "$SETTINGS_FILE" <<'PYEOF'
 import json, sys
 
@@ -449,7 +449,6 @@ if IS_JS_ENV; then
   rm -f "$TARGET_DIR/pyproject.toml"
   success "pyproject.toml 제거 완료"
 
-
   # pre-bash-guard.sh 오버라이드 (Django migrate 경고 제거)
   if [ -f "$TEMPLATE_DIR/js/.claude/hooks/pre-bash-guard.sh" ]; then
     cp -f "$TEMPLATE_DIR/js/.claude/hooks/pre-bash-guard.sh" "$TARGET_DIR/.claude/hooks/pre-bash-guard.sh"
@@ -506,8 +505,6 @@ if IS_PYTHON_ENV; then
     bash "$SCRIPT_DIR/scripts/domain-fill.sh" "$TARGET_DIR"
   fi
 fi
-
-fi # SKIP_FULL_INSTALL
 
 # 전역 자기강화 루프(debrief-guardrails + session 훅)는 ~/.claude 전역의 weekly-retro
 # 체계(debrief 누적 + /weekly-retro 승격 게이트 → rules/rules.yaml 규칙 레지스트리 →
@@ -566,7 +563,6 @@ echo "  GitHub Actions:"
 echo "  claude-code-review · claude · pr-auto-fill · pr-test · post-merge-docs · domain-drift"
 echo ""
 
-RED='\033[0;31m'
 echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${RED}  ⚠  필수 설정 — 하지 않으면 Harness가 동작하지 않습니다${NC}"
 echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -625,6 +621,8 @@ if IS_JS_ENV; then
   echo ""
   echo "  자동화 힌트 (스크립트로 스켈레톤 생성하고 싶다면):"
   echo "  Django용 자동 생성 스크립트를 참고해 ORM에 맞게 응용하세요:"
-  echo "  → $(dirname "$0")/scripts/domain-init.sh"
+  echo "  → $SCRIPT_DIR/scripts/domain-init.sh"
   echo ""
 fi
+
+fi # SKIP_FULL_INSTALL — 스택 미감지 시에는 위 최소 하네스 안내로 끝낸다

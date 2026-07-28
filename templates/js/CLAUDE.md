@@ -1,3 +1,5 @@
+<!-- harness-init: DO NOT REMOVE -->
+
 # CLAUDE.md
 
 {project_name} — {stack} (예: Next.js 14 / NestJS / Express) / {deployment_info}

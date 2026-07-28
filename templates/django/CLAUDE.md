@@ -1,3 +1,5 @@
+<!-- harness-init: DO NOT REMOVE -->
+
 # CLAUDE.md
 
 {project_name} — Django {version} / {deployment_info}

@@ -10,6 +10,8 @@ set -e
 TARGET_DIR="${1:-$PWD}"
 TODAY=$(date +%Y-%m-%d)
 PROJECT_NAME=$(basename "$TARGET_DIR")
+INDEX_HEADING="앱별 DOMAIN.md (domain-init.sh 자동 생성)"
+INIT_SIGNATURE="DOMAIN.md 초기 생성 (domain-init.sh)"
 
 GREEN='\033[0;32m'; YELLOW='\033[1;33m'; BLUE='\033[0;34m'; NC='\033[0m'
 info()    { echo -e "${BLUE}[domain-init]${NC} $1"; }
@@ -160,12 +162,17 @@ generate_root_domain() {
   done
 
   if $exists; then
+    # domain-init.sh 가 만든 인덱스가 이미 있으면 재실행마다 섹션이 쌓이므로 건너뛴다
+    if grep -qF -e "$INDEX_HEADING" -e "$INIT_SIGNATURE" "$root_file"; then
+      warn "루트 DOMAIN.md 에 앱 인덱스가 이미 있음, 건너뜀"
+      return
+    fi
     warn "루트 DOMAIN.md 이미 존재 — 앱 인덱스 섹션을 파일 끝에 추가합니다"
     {
       echo ""
       echo "---"
       echo ""
-      echo "## 앱별 DOMAIN.md (domain-init.sh 자동 생성)"
+      echo "## $INDEX_HEADING"
       echo ""
       echo "> 새 앱이 추가되면 이 테이블에 행을 추가하세요."
       echo ""
@@ -248,7 +255,7 @@ generate_root_domain() {
     echo ""
     echo "| 날짜 | 변경 내용 |"
     echo "|-----|----------|"
-    echo "| ${TODAY} | DOMAIN.md 초기 생성 (domain-init.sh) |"
+    echo "| ${TODAY} | ${INIT_SIGNATURE} |"
   } > "$root_file"
 
   success "루트 DOMAIN.md 생성"

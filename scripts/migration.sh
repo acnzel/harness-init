@@ -88,55 +88,55 @@ detect_stack() {
 configure_stack() {
   case "$1" in
     fastapi)
-      STACK_LABEL="FastAPI";         LANG="Python"
+      STACK_LABEL="FastAPI"
       LAYER_PATTERN="Routers → Services → Repositories"; LAYER_TOP="Routers"
       TEST_TOOL="pytest";            TEST_CMD="pytest"
       FACTORY_DESC="factoryboy 기반 Factory"
       ;;
     flask)
-      STACK_LABEL="Flask";           LANG="Python"
+      STACK_LABEL="Flask"
       LAYER_PATTERN="Views → Services → Repositories";   LAYER_TOP="Views"
       TEST_TOOL="pytest";            TEST_CMD="pytest"
       FACTORY_DESC="factoryboy 기반 Factory"
       ;;
     express)
-      STACK_LABEL="Express.js";      LANG="TypeScript"
+      STACK_LABEL="Express.js"
       LAYER_PATTERN="Controllers → Services → Repositories"; LAYER_TOP="Controllers"
       TEST_TOOL="Jest";              TEST_CMD="npm test"
       FACTORY_DESC="@faker-js/faker 기반 Factory"
       ;;
     nextjs)
-      STACK_LABEL="Next.js";         LANG="TypeScript"
+      STACK_LABEL="Next.js"
       LAYER_PATTERN="Route Handlers → Services → Data Layer"; LAYER_TOP="Route Handlers"
       TEST_TOOL="Jest + Testing Library"; TEST_CMD="npm test"
       FACTORY_DESC="@faker-js/faker 기반 Factory"
       ;;
     nestjs)
-      STACK_LABEL="NestJS";          LANG="TypeScript"
+      STACK_LABEL="NestJS"
       LAYER_PATTERN="Controllers → Services → Repositories"; LAYER_TOP="Controllers"
       TEST_TOOL="Jest";              TEST_CMD="npm test"
       FACTORY_DESC="@nestjs/testing 기반 Factory"
       ;;
     node)
-      STACK_LABEL="Node.js";         LANG="JavaScript/TypeScript"
+      STACK_LABEL="Node.js"
       LAYER_PATTERN="Controllers → Services → Data Layer"; LAYER_TOP="Controllers"
       TEST_TOOL="Jest";              TEST_CMD="npm test"
       FACTORY_DESC="faker 기반 Factory"
       ;;
     rails)
-      STACK_LABEL="Ruby on Rails";   LANG="Ruby"
+      STACK_LABEL="Ruby on Rails"
       LAYER_PATTERN="Controllers → Services → ActiveRecord"; LAYER_TOP="Controllers"
       TEST_TOOL="RSpec";             TEST_CMD="bundle exec rspec"
       FACTORY_DESC="FactoryBot 기반 Factory"
       ;;
     springboot)
-      STACK_LABEL="Spring Boot";     LANG="Java/Kotlin"
+      STACK_LABEL="Spring Boot"
       LAYER_PATTERN="Controllers → Services → Repositories"; LAYER_TOP="Controllers"
       TEST_TOOL="JUnit 5";           TEST_CMD="./gradlew test"
       FACTORY_DESC="TestEntityManager 기반 Fixture"
       ;;
     *)
-      STACK_LABEL="Unknown";         LANG="Unknown"
+      STACK_LABEL="Unknown"
       LAYER_PATTERN="Controllers → Services → Data Layer"; LAYER_TOP="Controllers"
       TEST_TOOL="{test_tool}";       TEST_CMD="{test_command}"
       FACTORY_DESC="{factory_pattern}"

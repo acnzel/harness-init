@@ -21,8 +21,6 @@ if [ -f "$TARGET_FILE" ]; then
   echo -e "\033[0;34m[harness]\033[0m 기존 CLAUDE.md 백업: $(basename "$BACKUP_FILE")"
   {
     echo ""
-    echo "$MARKER"
-    echo ""
     cat "$TEMPLATE_FILE"
   } >> "$TARGET_FILE"
   echo -e "\033[0;32m[harness]\033[0m ✓ CLAUDE.md 업데이트 완료"

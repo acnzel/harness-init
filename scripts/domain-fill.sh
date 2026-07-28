@@ -161,14 +161,7 @@ Rules:
   fi
 
   echo ""
-done < <(find "$TARGET_DIR" -name "models.py" \
-  ! -path "*/migrations/*" \
-  ! -path "*/.venv/*" \
-  ! -path "*/venv/*" \
-  ! -path "*/env/*" \
-  ! -path "*/__pycache__/*" \
-  ! -path "*/.git/*" \
-  2>/dev/null)
+done <<< "$APPS"
 
 # ── 루트 DOMAIN.md 통합 채우기 ──────────────────────────
 ROOT_DOMAIN="$TARGET_DIR/DOMAIN.md"

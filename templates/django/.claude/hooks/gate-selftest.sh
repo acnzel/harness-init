@@ -72,6 +72,11 @@ fi
 GUARD="$HOOK_DIR/pre-bash-guard.sh"
 if [ ! -f "$GUARD" ]; then
 	skip "pre-bash-guard.sh 미설치"
+elif ! command -v python3 >/dev/null 2>&1; then
+	# python3 가 없으면 payload() 가 빈 문자열을 내서 훅이 조용히 통과한다.
+	# 그걸 "게이트 사망"으로 부르면 원인(python3 부재)이 가려진다. 위 1번 항목이
+	# 이미 그 사실을 실패로 보고했으므로 여기서는 판정을 보류한다.
+	skip "pre-bash-guard.sh 판정 보류 (python3 없음 — 위 항목 참조)"
 else
 	# 페이로드를 먼저 변수에 담는다. 파이프로 바로 물리면 죽은 훅(stdin 을
 	# 읽지 않는 훅)이 즉시 종료하면서 생산자 쪽에 SIGPIPE 가 떠서, 정작
@@ -115,7 +120,10 @@ if [ ! -f "$RUNNER" ]; then
 	skip "gate-runner.py 미설치"
 else
 	TMP_REPO=$(mktemp -d 2>/dev/null)
-	if [ -n "$TMP_REPO" ]; then
+	if [ -z "$TMP_REPO" ]; then
+		# 조용히 넘어가면 자가진단에 구멍이 생긴다. 검사하지 못했다고 말한다.
+		skip "gate-runner.py 판정 보류 (임시 디렉터리 생성 실패)"
+	else
 		mkdir -p "$TMP_REPO/.claude"
 		cat >"$TMP_REPO/.claude/gates.json" <<'JSON'
 {"gates":[

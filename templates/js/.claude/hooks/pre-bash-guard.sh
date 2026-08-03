@@ -6,7 +6,14 @@
 # 환경변수를 읽어서 **한 번도 발화한 적이 없었다** (2026-08-03 실측).
 # 파싱은 _hook-input.sh 에 위임한다 (django 템플릿에서 함께 설치된다).
 
-source "$(dirname "${BASH_SOURCE[0]}")/_hook-input.sh"
+_HELPER="$(dirname "${BASH_SOURCE[0]}")/_hook-input.sh"
+if [ ! -f "$_HELPER" ]; then
+	# _hook-input.sh 는 django 템플릿에서 함께 설치된다. 부분 설치로 빠지면
+	# source 가 실패하고 hook_input_load 가 정의되지 않아 훅이 조용히 죽는다.
+	echo "[harness] $_HELPER 없음 — pre-bash-guard 가 동작하지 않습니다 (부분 설치)." >&2
+	exit 0
+fi
+source "$_HELPER"
 
 hook_input_load || exit 0
 

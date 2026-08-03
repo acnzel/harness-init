@@ -188,7 +188,19 @@ cp "$SCRIPT_DIR/scripts/domain-extract.py" \
    "$SCRIPT_DIR/scripts/commit-msg.py" \
    "$TARGET_DIR/.claude/scripts/" 2>/dev/null || true
 chmod +x "$TARGET_DIR/.claude/scripts/"*.py 2>/dev/null || true
-success "하네스 소유 도구 설치 완료 (.claude/scripts/ — extract/gate/freshness/hook-io/gate-runner)"
+
+# 복사가 실패하면 기존 설치가 낡은 판정기를 그대로 쓰면서 설치는 성공으로 보고된다.
+# 이 하네스가 없애려는 실패 유형이 정확히 그것이라, 도착했는지 확인하고 알린다.
+_missing_tools=""
+for _t in domain-extract domain-gate domain-freshness hook-io gate-runner render-agents pr-body commit-msg; do
+  [ -f "$TARGET_DIR/.claude/scripts/$_t.py" ] || _missing_tools="$_missing_tools $_t.py"
+done
+if [ -n "$_missing_tools" ]; then
+  warn "하네스 소유 도구 복사 실패:$_missing_tools"
+  warn "  해당 게이트는 동작하지 않습니다. 권한·디스크 상태를 확인하고 재실행하세요."
+else
+  success "하네스 소유 도구 설치 완료 (.claude/scripts/ — domain-extract/domain-gate/domain-freshness/hook-io/gate-runner/render-agents/pr-body/commit-msg)"
+fi
 
 # 게이트 선언은 사용자 소유다. 프로젝트마다 검사 목록이 다르고, 한번 손대면
 # 그게 그 팀의 것이 된다. 러너(위)는 덮어쓰고 선언(아래)은 보존한다.
@@ -522,7 +534,7 @@ block = """  # harness-init 추가 — 커밋 메시지에 브랜치의 티켓 �
         entry: python3 .claude/scripts/render-agents.py --repo .
         language: system
         pass_filenames: false
-        files: '^\\\\.claude/(gates\\\\.json|settings\\\\.json)$|^AGENTS\\\\.md$'
+        files: '^\\.claude/(gates\\.json|settings\\.json)$|^AGENTS\\.md$'
         stages: [pre-commit]
 
   # harness-init 추가 — 통합 게이트 (push 직전)
@@ -539,15 +551,35 @@ block = """  # harness-init 추가 — 커밋 메시지에 브랜치의 티켓 �
         verbose: true
 
 """
+# `repos:` 를 못 찾으면 아무것도 쓰지 않고 끝난다. 그 상태로 두면 원본이
+# 그대로라 validate-config 가 통과하고, 호출부가 "추가했다"고 보고한다.
+# 이 PR 이 없애려는 바로 그 거짓 성공이라, 삽입 여부를 종료 코드로 알린다.
 for index, line in enumerate(lines):
     if line.rstrip() == "repos:":
         lines.insert(index + 1, block)
         open(path, "w", encoding="utf-8").writelines(lines)
-        break
+        sys.exit(0)
+sys.exit(1)
 PYEOF
-        # 인자 없는 validate-config 는 아무것도 검사하지 않고 0 을 돌려준다.
-        # 파일명을 반드시 넘긴다 (이걸 빼서 깨진 YAML 을 통과시킨 적이 있다).
-        if (cd "$TARGET_DIR" && pre-commit validate-config .pre-commit-config.yaml >/dev/null 2>&1); then
+        _pc_inserted=$?
+        # 삽입 자체가 안 됐으면 파일은 원본 그대로다. 그 상태로 validate-config 를
+        # 돌리면 당연히 통과하고, 아무것도 안 했는데 "추가했다"고 보고하게 된다.
+        # 인자 없는 validate-config 는 아무것도 검사하지 않고 0 을 돌려주므로
+        # 파일명도 반드시 넘긴다 (이걸 빼서 깨진 YAML 을 통과시킨 적이 있다).
+        if [ "$_pc_inserted" -ne 0 ]; then
+          rm -f "$PC_CONFIG.harness-bak"
+          warn "pre-commit 설정에서 'repos:' 줄을 찾지 못해 게이트를 넣지 못했습니다."
+          warn "  (repos: [] 한 줄 형태이거나 뒤에 주석이 붙은 경우입니다.)"
+          warn "  .pre-commit-config.yaml 의 repos 목록에 아래를 직접 추가하세요:"
+          warn "    - repo: local"
+          warn "      hooks:"
+          warn "        - id: gate-runner-pre-push"
+          warn "          entry: python3 .claude/scripts/gate-runner.py --stage pre-push"
+          warn "          language: system"
+          warn "          pass_filenames: false"
+          warn "          always_run: true"
+          warn "          stages: [pre-push]"
+        elif (cd "$TARGET_DIR" && pre-commit validate-config .pre-commit-config.yaml >/dev/null 2>&1); then
           rm -f "$PC_CONFIG.harness-bak"
           success "pre-push 통합 게이트를 기존 .pre-commit-config.yaml 에 추가"
         else

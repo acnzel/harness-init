@@ -113,6 +113,13 @@ def load_gates(path):
         for field in ("name", "cmd", "stages"):
             if not gate.get(field):
                 return None, f"gates[{index}] 에 '{field}' 가 없습니다"
+        # stages 를 문자열로 쓰면 set("ci") 가 {'c','i'} 가 되어 조용히 아무 stage 에도
+        # 안 걸린다. 오타 한 번에 게이트가 사라지므로 타입을 먼저 본다.
+        if not isinstance(gate["stages"], list):
+            return None, (
+                f"gates[{index}] '{gate['name']}' 의 stages 는 배열이어야 합니다 "
+                f'(예: ["pre-push", "ci"])'
+            )
         unknown = set(gate["stages"]) - set(VALID_STAGES)
         if unknown:
             return None, (
@@ -155,7 +162,9 @@ def run_gate(gate, root):
     if completed.returncode == 0:
         return "PASS", elapsed, output
     if gate.get("allow_failure"):
-        return "SKIP", elapsed, f"실패했지만 allow_failure — {output}"
+        # SKIP 으로 세지 않는다. SKIP 은 "실행하지 못했다"는 뜻인데 이건 실행하고
+        # 실패한 것이다. 섞으면 "실행된 게이트가 없습니다" 경고가 잘못 뜬다.
+        return "WARN", elapsed, f"실패했지만 allow_failure: {output}"
     return "FAIL", elapsed, output
 
 
@@ -186,6 +195,8 @@ def cmd_run(gates, stage, root, fail_fast):
 
         if status == "PASS":
             print(f"  {GREEN}✓ PASS{RESET}  ({elapsed:.1f}초)")
+        elif status == "WARN":
+            print(f"  {YELLOW}! WARN{RESET}  ({elapsed:.1f}초) {output.strip()[:120]}")
         elif status == "SKIP":
             print(f"  {YELLOW}- SKIP{RESET}  {output.strip()[:120]}")
         else:
@@ -204,13 +215,21 @@ def summarize(results, stage, root, total_elapsed):
     passed = [g for g, s, _ in results if s == "PASS"]
     failed = [g for g, s, _ in results if s == "FAIL"]
     skipped = [g for g, s, _ in results if s == "SKIP"]
+    warned = [g for g, s, _ in results if s == "WARN"]
 
     print("\n" + "─" * 52)
-    print(
+    summary = (
         f"  {GREEN}PASS {len(passed)}{RESET} · "
         f"{RED}FAIL {len(failed)}{RESET} · "
-        f"{YELLOW}SKIP {len(skipped)}{RESET}   (총 {total_elapsed:.1f}초)"
+        f"{YELLOW}SKIP {len(skipped)}{RESET}"
     )
+    if warned:
+        summary += f" · {YELLOW}WARN {len(warned)}{RESET}"
+    print(f"{summary}   (총 {total_elapsed:.1f}초)")
+
+    if warned:
+        names = ", ".join(g["name"] for g in warned)
+        print(f"  {YELLOW}! allow_failure 로 통과 처리됨: {names}{RESET}")
 
     # SKIP 을 통과로 읽는 것을 막는다. 이름을 다시 불러야 눈에 들어온다.
     if skipped:
@@ -221,7 +240,7 @@ def summarize(results, stage, root, total_elapsed):
     # 초록불로 보이지만 아무것도 검사하지 않았다. 도구가 없는 머신에서 push 를
     # 통째로 막는 건 과하므로 통과시키되, 이 상태를 조용히 넘기지는 않는다.
     # (검사가 0건인 것은 안전 신호가 아니라 스캐너가 없다는 신호다.)
-    if skipped and not passed and not failed:
+    if skipped and not passed and not failed and not warned:
         print(
             f"  {RED}⚠ 실행된 게이트가 없습니다 — 이 push 는 아무것도 검증되지 "
             f"않았습니다.{RESET}"
@@ -244,6 +263,7 @@ def summarize(results, stage, root, total_elapsed):
                 "pass": [g["name"] for g in passed],
                 "fail": [g["name"] for g in failed],
                 "skip": [g["name"] for g in skipped],
+                "warn": [g["name"] for g in warned],
             },
             ensure_ascii=False,
         ),

@@ -29,11 +29,46 @@ source 해야 할 경로만 늘어난다.
 import argparse
 import json
 import os
+import re
 import shlex
 import sys
 from datetime import datetime, timezone
 
 DETAIL_LIMIT = 400
+
+# 발화 기록에는 명령 원문이 들어간다. 그런데 이 훅이 발화하는 상황은 대개 DB 명령이라
+# (`mysql -p...`, `psql`, 덤프 스크립트) 자격증명이 같은 줄에 붙어 있을 확률이 높다.
+# events 파일은 gitignore 대상이지만 평문으로 디스크에 남고, 디버깅하며 통째로 공유되기도
+# 한다. 완전한 시크릿 스캐너를 만들 생각은 없고, 흔한 형태만 가린다.
+REDACTIONS = (
+    (re.compile(r"(--password[=\s]+)(\S+)"), r"\1***"),
+    (
+        re.compile(
+            r"((?:PASSWORD|PASSWD|TOKEN|SECRET|API_KEY|ACCESS_KEY)\s*=\s*)(\S+)", re.I
+        ),
+        r"\1***",
+    ),
+    (re.compile(r"(Authorization:\s*\S+\s*)(\S+)", re.I), r"\1***"),
+    (re.compile(r"\b(gh[pousr]_)[A-Za-z0-9]{16,}", re.I), r"\1***"),
+    (re.compile(r"\bAKIA[0-9A-Z]{16}\b"), "AKIA***"),
+)
+
+
+# mysql 계열의 붙여쓰는 `-pPASSWORD`. 앞에 `-` 가 오면(`--password`, `--profile`)
+# 걸리지 않게 하고, DB 클라이언트를 부르는 명령에서만 적용한다. 전역으로 걸면
+# `find -print` 나 `aws --profile` 까지 가려져 로그를 못 읽게 된다.
+DB_CLIENT_RE = re.compile(r"\b(mysql|mysqldump|mariadb|psql|pg_dump)\b")
+MYSQL_PW_RE = re.compile(r"(?<![-\w])(-p)(?=\S)([^\s'\"]+)")
+
+
+def redact(text):
+    for pattern, replacement in REDACTIONS:
+        text = pattern.sub(replacement, text)
+    if DB_CLIENT_RE.search(text):
+        text = MYSQL_PW_RE.sub(r"\1***", text)
+    return text
+
+
 EMPTY = {
     "HOOK_EVENT": "",
     "HOOK_TOOL": "",
@@ -125,7 +160,12 @@ def record_event(event, source, repo="", **fields):
     for key, value in fields.items():
         if value in (None, ""):
             continue
-        record[key] = value[:DETAIL_LIMIT] if isinstance(value, str) else value
+        if isinstance(value, str):
+            # 마스킹을 자르기 **전에** 한다. 자른 뒤에 하면 잘린 경계에서 패턴이
+            # 깨져 시크릿 앞부분이 그대로 남는다.
+            record[key] = redact(value)[:DETAIL_LIMIT]
+        else:
+            record[key] = value
 
     path = event_path(repo_root(repo), now)
     try:

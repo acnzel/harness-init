@@ -95,9 +95,21 @@ def render_pipeline(gates, wired=None):
         ]
         return lines
 
+    # gates.json 이 손상돼 있어도 여기서 죽으면 안 된다. 예외가 나면 종료 코드가
+    # 2 가 되고, 자가진단은 그걸 "마커 손상"으로 잘못 보고한다. 원인을 가리는 셈이다.
+    def gate_names(stage):
+        out = []
+        for gate in gates:
+            if not isinstance(gate, dict):
+                continue
+            stages = gate.get("stages")
+            if isinstance(stages, list) and stage in stages:
+                out.append(str(gate.get("name") or "(이름 없음)"))
+        return out
+
     lines += ["| 시점 | 검사 |", "|---|---|"]
     for stage, label in STAGE_LABELS:
-        names = [g["name"] for g in gates if stage in g.get("stages", [])]
+        names = gate_names(stage)
         row = ", ".join(names) if names else "없음"
         if stage == "ci" and wired is False and names:
             row += " ⚠️ **CI 미연결**"

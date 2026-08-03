@@ -42,6 +42,11 @@ HARNESS_PATHS = (
 
 
 def changed_files(repo, base, head):
+    """(파일 목록, 성공 여부) — 실패를 '변경 0건'으로 위장하지 않는다.
+
+    fetch-depth 부족이나 잘못된 SHA 로 git diff 가 실패하면 빈 목록이 나오는데,
+    그걸 그대로 "변경 파일: 0개"로 적으면 PR 본문이 거짓을 말한다.
+    """
     try:
         out = subprocess.run(
             ["git", "diff", "--name-only", f"{base}...{head}"],
@@ -51,8 +56,8 @@ def changed_files(repo, base, head):
             check=True,
         ).stdout
     except (OSError, subprocess.CalledProcessError):
-        return []
-    return [line for line in out.splitlines() if line.strip()]
+        return [], False
+    return [line for line in out.splitlines() if line.strip()], True
 
 
 def ci_gate_names(repo):
@@ -71,7 +76,7 @@ def ci_gate_names(repo):
 
 
 def build_block(repo, base, head):
-    files = changed_files(repo, base, head)
+    files, diff_ok = changed_files(repo, base, head)
     gates = ci_gate_names(repo)
     touched_harness = sorted(
         {p for f in files for p in HARNESS_PATHS if f == p or f.startswith(p)}
@@ -85,8 +90,14 @@ def build_block(repo, base, head):
         "### 자동 수집",
         "",
         f"- 기준 SHA: `{base[:12]}` → `{head[:12]}`",
-        f"- 변경 파일: {len(files)}개",
     ]
+    if diff_ok:
+        lines.append(f"- 변경 파일: {len(files)}개")
+    else:
+        lines.append(
+            "- 변경 파일: **집계 실패** (git diff 를 실행할 수 없었습니다. "
+            "fetch-depth 나 SHA 를 확인하세요.)"
+        )
 
     if files:
         lines.append("")
@@ -127,13 +138,21 @@ def merge(body, block):
         end = body.find(MARKER_END)
         if start < end:
             return body[:start] + block + body[end + len(MARKER_END) :]
-        # 순서가 뒤집힌 손상 상태. 자르면 사람이 쓴 내용이 유실되므로 손대지 않고
-        # 앞에 붙이기만 한다.
+        # 순서가 뒤집힌 손상 상태. 자르면 사람이 쓴 내용이 유실되므로 손대지 않는다.
     elif starts == 0 and ends == 0:
         return block + "\n\n" + body if body.strip() else block
 
-    # 마커가 여러 개거나 짝이 안 맞으면 잘라내지 않는다. 덧붙이는 쪽이 안전하다.
-    return block + "\n\n" + body
+    # 마커가 여러 개거나 짝이 안 맞는 손상 상태. 사람이 쓴 내용을 잘라낼 수 없으니
+    # 앞에 붙이되, **직전에 우리가 붙인 블록은 교체**한다. 그냥 붙이기만 하면
+    # 실행할 때마다 본문이 계속 자라 결국 본문이 자동 블록으로 뒤덮인다.
+    stripped = body.lstrip()
+    offset = len(body) - len(stripped)
+    if stripped.startswith(MARKER_START):
+        first_end = stripped.find(MARKER_END)
+        if first_end != -1:
+            rest = stripped[first_end + len(MARKER_END) :].lstrip("\n")
+            return block + "\n\n" + rest if rest.strip() else block
+    return block + "\n\n" + body[offset:]
 
 
 def main(argv=None):
@@ -149,8 +168,11 @@ def main(argv=None):
     block = build_block(args.repo, args.base, args.head)
 
     body = ""
-    if args.body_file and os.path.exists(args.body_file):
-        body = open(args.body_file, encoding="utf-8").read()
+    if args.body_file:
+        # --body-file 을 준 경우에는 stdin 으로 넘어가지 않는다. 파일이 없다고
+        # stdin 을 읽으러 가면 파이프가 안 닫힌 환경에서 그대로 멈춘다.
+        if os.path.exists(args.body_file):
+            body = open(args.body_file, encoding="utf-8").read()
     elif not sys.stdin.isatty():
         body = sys.stdin.read()
 

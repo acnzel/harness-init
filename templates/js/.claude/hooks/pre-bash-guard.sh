@@ -7,13 +7,13 @@
 # 파싱은 _hook-input.sh 에 위임한다 (django 템플릿에서 함께 설치된다).
 
 _HELPER="$(dirname "${BASH_SOURCE[0]}")/_hook-input.sh"
-if [ ! -f "$_HELPER" ]; then
-	# _hook-input.sh 는 django 템플릿에서 함께 설치된다. 부분 설치로 빠지면
-	# source 가 실패하고 hook_input_load 가 정의되지 않아 훅이 조용히 죽는다.
-	echo "[harness] $_HELPER 없음 — pre-bash-guard 가 동작하지 않습니다 (부분 설치)." >&2
+# 없음·읽기 불가·문법 오류를 한 번에 잡는다. 파일 존재만 확인하면 읽을 수 없거나
+# 문법이 깨진 헬퍼를 놓치는데, 그때 source 가 실패해 hook_input_load 가 정의되지
+# 않고 다음 줄이 command not found 로 exit 0 이 되어 훅이 조용히 꺼진다.
+if ! source "$_HELPER" || ! declare -F hook_input_load >/dev/null; then
+	echo "[harness] $_HELPER 를 불러올 수 없습니다 — pre-bash-guard 가 동작하지 않습니다." >&2
 	exit 0
 fi
-source "$_HELPER"
 
 hook_input_load || exit 0
 

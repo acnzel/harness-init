@@ -7,7 +7,13 @@
 # JSON 을 넣으면 무음 exit 0, TOOL_INPUT 을 강제 주입해야만 경고가 나왔다).
 # 파싱은 _hook-input.sh 에 위임한다 — 훅마다 각자 파싱하면 같은 일이 반복된다.
 
-source "$(dirname "${BASH_SOURCE[0]}")/_hook-input.sh"
+_HELPER="$(dirname "${BASH_SOURCE[0]}")/_hook-input.sh"
+# 없음·읽기 불가·문법 오류를 한 번에 잡는다. source 가 실패하면 hook_input_load 가
+# 정의되지 않고, 다음 줄이 command not found 로 exit 0 이 되어 훅이 조용히 꺼진다.
+if ! source "$_HELPER" || ! declare -F hook_input_load >/dev/null; then
+	echo "[harness] $_HELPER 를 불러올 수 없습니다 — pre-bash-guard 가 동작하지 않습니다." >&2
+	exit 0
+fi
 
 hook_input_load || exit 0
 

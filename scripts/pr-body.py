@@ -169,10 +169,19 @@ def main(argv=None):
 
     body = ""
     if args.body_file:
-        # --body-file 을 준 경우에는 stdin 으로 넘어가지 않는다. 파일이 없다고
-        # stdin 을 읽으러 가면 파이프가 안 닫힌 환경에서 그대로 멈춘다.
-        if os.path.exists(args.body_file):
+        # 읽지 못하면 **아무것도 출력하지 않고 실패한다**. 빈 본문으로 진행하면
+        # 자동 블록만 남은 결과가 나오고, 호출부가 그걸 그대로 PR 에 쓰면 사람이 쓴
+        # 본문이 통째로 지워진다. 이 스크립트가 없애려던 사고가 바로 그것이다.
+        # stdin 으로 대체하지도 않는다. 파이프가 안 닫힌 환경에서 그대로 멈춘다.
+        try:
             body = open(args.body_file, encoding="utf-8").read()
+        except OSError as exc:
+            print(
+                f"[pr-body] --body-file 을 읽을 수 없습니다: {exc}\n"
+                f"[pr-body] 본문을 덮어쓰지 않도록 아무것도 출력하지 않고 멈춥니다.",
+                file=sys.stderr,
+            )
+            return 2
     elif not sys.stdin.isatty():
         body = sys.stdin.read()
 

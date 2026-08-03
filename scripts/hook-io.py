@@ -110,31 +110,42 @@ def event_path(root, now):
     return os.path.join(root, ".claude", "local", f"events-{now:%Y-%m}.jsonl")
 
 
-def cmd_event(args):
-    now = datetime.now(timezone.utc)
-    root = repo_root(args.repo)
-    path = event_path(root, now)
+def record_event(event, source, repo="", **fields):
+    """이벤트 한 줄을 append 한다. 실패해도 절대 예외를 올리지 않는다.
 
+    gate-runner.py 처럼 같은 디렉터리의 다른 도구가 importlib 로 불러 쓴다.
+    기록 구현이 두 벌이 되면 포맷이 갈라지므로 진입점은 여기 하나다.
+    """
+    now = datetime.now(timezone.utc)
     record = {
         "ts": now.isoformat(timespec="seconds"),
-        "event": args.event,
-        "source": args.source,
+        "event": event,
+        "source": source,
     }
-    for key, value in (
-        ("tool", args.tool),
-        ("session", args.session),
-        ("detail", (args.detail or "")[:DETAIL_LIMIT] or None),
-    ):
-        if value:
-            record[key] = value
+    for key, value in fields.items():
+        if value in (None, ""):
+            continue
+        record[key] = value[:DETAIL_LIMIT] if isinstance(value, str) else value
 
+    path = event_path(repo_root(repo), now)
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "a", encoding="utf-8") as handle:
             handle.write(json.dumps(record, ensure_ascii=False) + "\n")
     except OSError:
         # 계측 실패가 게이트를 막아서는 안 된다. 훅 쪽에서도 || true 로 감싼다.
-        return 0
+        pass
+
+
+def cmd_event(args):
+    record_event(
+        args.event,
+        args.source,
+        repo=args.repo,
+        tool=args.tool,
+        session=args.session,
+        detail=args.detail,
+    )
     return 0
 
 

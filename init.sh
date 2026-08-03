@@ -182,9 +182,15 @@ cp "$SCRIPT_DIR/scripts/domain-extract.py" \
    "$SCRIPT_DIR/scripts/domain-gate.py" \
    "$SCRIPT_DIR/scripts/domain-freshness.py" \
    "$SCRIPT_DIR/scripts/hook-io.py" \
+   "$SCRIPT_DIR/scripts/gate-runner.py" \
    "$TARGET_DIR/.claude/scripts/" 2>/dev/null || true
 chmod +x "$TARGET_DIR/.claude/scripts/"*.py 2>/dev/null || true
-success "도메인 지식 도구 설치 완료 (.claude/scripts/ — extract/gate/freshness/hook-io)"
+success "하네스 소유 도구 설치 완료 (.claude/scripts/ — extract/gate/freshness/hook-io/gate-runner)"
+
+# 게이트 선언은 사용자 소유다. 프로젝트마다 검사 목록이 다르고, 한번 손대면
+# 그게 그 팀의 것이 된다. 러너(위)는 덮어쓰고 선언(아래)은 보존한다.
+cp -n "$TEMPLATE_DIR/django/.claude/gates.json" \
+      "$TARGET_DIR/.claude/gates.json" 2>/dev/null || true
 
 PROJECT_NAME=$(basename "$TARGET_DIR")
 
@@ -467,6 +473,66 @@ if [ -n "$PRECOMMIT_YAML" ] && [ -f "$PRECOMMIT_YAML" ]; then
   if git -C "$TARGET_DIR" rev-parse --git-dir &>/dev/null; then
     if command -v pre-commit &>/dev/null; then
       (cd "$TARGET_DIR" && pre-commit install) && success "pre-commit 훅 등록 완료"
+
+      # 기존 설치는 .pre-commit-config.yaml 이 이미 있어 템플릿이 복사되지 않는다.
+      # 그러면 pre-push 통합 게이트가 영영 안 들어간다. 없을 때만 덧붙이고,
+      # 붙인 결과가 유효하지 않으면 되돌린다 (사용자 설정을 깨뜨리지 않는다).
+      PC_CONFIG="$TARGET_DIR/.pre-commit-config.yaml"
+      if [ -f "$PC_CONFIG" ] && ! grep -q 'gate-runner-pre-push' "$PC_CONFIG"; then
+        cp "$PC_CONFIG" "$PC_CONFIG.harness-bak"
+        # EOF 에 덧붙이지 않고 `repos:` 바로 뒤에 끼운다. 파일 끝이 항상 repos
+        # 리스트라는 보장이 없다 — `ci:` 같은 최상위 키가 뒤에 오면 덧붙인
+        # 블록이 그 키 밑으로 들어가 YAML 이 깨진다 (실측으로 확인).
+        # YAML 을 파싱해 재덤프하지 않는 이유는 주석이 전부 날아가기 때문이다.
+        python3 - "$PC_CONFIG" <<'PYEOF'
+import sys
+
+path = sys.argv[1]
+lines = open(path, encoding="utf-8").read().splitlines(keepends=True)
+block = """  # 통합 게이트 (push 직전) — harness-init 추가
+  # 로컬과 CI 가 같은 러너·같은 .claude/gates.json 을 쓴다.
+  - repo: local
+    hooks:
+      - id: gate-runner-pre-push
+        name: 통합 게이트 (pre-push)
+        entry: python3 .claude/scripts/gate-runner.py --stage pre-push
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+        verbose: true
+
+"""
+for index, line in enumerate(lines):
+    if line.rstrip() == "repos:":
+        lines.insert(index + 1, block)
+        open(path, "w", encoding="utf-8").writelines(lines)
+        break
+PYEOF
+        # 인자 없는 validate-config 는 아무것도 검사하지 않고 0 을 돌려준다.
+        # 파일명을 반드시 넘긴다 (이걸 빼서 깨진 YAML 을 통과시킨 적이 있다).
+        if (cd "$TARGET_DIR" && pre-commit validate-config .pre-commit-config.yaml >/dev/null 2>&1); then
+          rm -f "$PC_CONFIG.harness-bak"
+          success "pre-push 통합 게이트를 기존 .pre-commit-config.yaml 에 추가"
+        else
+          mv "$PC_CONFIG.harness-bak" "$PC_CONFIG"
+          warn "pre-push 게이트 자동 추가 실패 — 설정을 되돌렸습니다."
+          warn "  .pre-commit-config.yaml 에 아래를 직접 추가하세요:"
+          warn "    - repo: local"
+          warn "      hooks:"
+          warn "        - id: gate-runner-pre-push"
+          warn "          entry: python3 .claude/scripts/gate-runner.py --stage pre-push"
+          warn "          language: system"
+          warn "          pass_filenames: false"
+          warn "          always_run: true"
+          warn "          stages: [pre-push]"
+        fi
+      fi
+
+      # push 직전 통합 게이트. 별도 hook-type 이라 이 줄이 없으면 pre-push 는
+      # 설정에만 있고 실제로는 돌지 않는다 (조용히 없는 게이트가 된다).
+      (cd "$TARGET_DIR" && pre-commit install --hook-type pre-push) \
+        && success "pre-push 통합 게이트 등록 완료"
     fi
   else
     warn "git 저장소가 아닙니다. 'git init' 후 'pre-commit install' 수동 실행 필요"
@@ -525,6 +591,16 @@ if IS_JS_ENV; then
   success "pyproject.toml 제거 완료"
 
   # pre-bash-guard.sh 오버라이드 (Django migrate 경고 제거)
+  # 게이트 선언도 스택별로 다르다. 사용자 소유라 이미 있으면 보존한다
+  # (django 기본이 먼저 깔렸어도 사용자가 손댔으면 그게 우선이다).
+  if [ -f "$TEMPLATE_DIR/js/.claude/gates.json" ]; then
+    if [ ! -f "$TARGET_DIR/.claude/gates.json" ] || \
+       grep -q '"lint (ruff)"' "$TARGET_DIR/.claude/gates.json" 2>/dev/null; then
+      cp -f "$TEMPLATE_DIR/js/.claude/gates.json" "$TARGET_DIR/.claude/gates.json"
+      success "gates.json JS 버전으로 교체"
+    fi
+  fi
+
   if [ -f "$TEMPLATE_DIR/js/.claude/hooks/pre-bash-guard.sh" ]; then
     cp -f "$TEMPLATE_DIR/js/.claude/hooks/pre-bash-guard.sh" "$TARGET_DIR/.claude/hooks/pre-bash-guard.sh"
     chmod +x "$TARGET_DIR/.claude/hooks/pre-bash-guard.sh"

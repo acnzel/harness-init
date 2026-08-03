@@ -107,6 +107,47 @@ else
 	fail "domain-gate.py — 실행 실패 (의미 변화 게이트가 무력화됨)"
 fi
 
+# ── 4. gate-runner 판정 + 이 레포의 gates.json ─────────
+# positive/negative 를 합성 게이트 한 쌍으로 확인한다. 실패를 실패로 못 부르는
+# 러너는 push 직전 통합 게이트를 통째로 무력화한다.
+RUNNER="$SCRIPTS_DIR/gate-runner.py"
+if [ ! -f "$RUNNER" ]; then
+	skip "gate-runner.py 미설치"
+else
+	TMP_REPO=$(mktemp -d 2>/dev/null)
+	if [ -n "$TMP_REPO" ]; then
+		mkdir -p "$TMP_REPO/.claude"
+		cat >"$TMP_REPO/.claude/gates.json" <<'JSON'
+{"gates":[
+  {"name":"selftest-pass","cmd":"true","stages":["ci"]},
+  {"name":"selftest-fail","cmd":"false","stages":["ci"]}
+]}
+JSON
+		RUN_OUT=$(python3 "$RUNNER" --stage ci --repo "$TMP_REPO" --no-fail-fast 2>&1)
+		RUN_CODE=$?
+		rm -rf "$TMP_REPO"
+
+		if [ "$RUN_CODE" != 1 ]; then
+			fail "gate-runner.py — 실패하는 게이트에도 종료 코드 $RUN_CODE (실패를 못 잡음)"
+		elif ! printf '%s' "$RUN_OUT" | grep -q "PASS 1"; then
+			fail "gate-runner.py — 통과하는 게이트를 PASS 로 세지 못함"
+		else
+			pass "gate-runner.py — 통과/실패를 구분함"
+		fi
+	fi
+
+	# 이 레포의 선언이 실제로 파싱되는지. 오타를 push 직전이 아니라 지금 잡는다.
+	if [ -f "$PROJECT_DIR/.claude/gates.json" ]; then
+		if python3 "$RUNNER" --list --repo "$PROJECT_DIR" >/dev/null 2>&1; then
+			pass "gates.json — 선언 유효"
+		else
+			fail "gates.json — 파싱 실패 (push 직전 통합 게이트가 종료 코드 2로 막힌다)"
+		fi
+	else
+		skip "gates.json 미설치 — pre-push 통합 게이트 없음"
+	fi
+fi
+
 # ── 결과 ───────────────────────────────────────────────
 if [ -n "$FAILURES" ]; then
 	echo ""

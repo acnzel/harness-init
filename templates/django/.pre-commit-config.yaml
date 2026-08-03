@@ -1,3 +1,9 @@
+# 기본 실행 시점을 커밋으로 고정한다.
+# pre-commit 3.x 부터 stages 미지정 훅은 pre-push 를 포함한 '모든' 시점에서 돈다.
+# 그러면 push 할 때마다 커밋 훅이 통째로 재실행되고, pre-push 를 통합 게이트
+# 전용으로 두려던 구분이 사라진다. pre-push 는 아래에서 명시적으로 선언한다.
+default_stages: [pre-commit]
+
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
@@ -32,3 +38,19 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
+
+  # 통합 게이트 (push 직전).
+  # pre-commit 은 변경 파일만 보고 CI 는 너무 늦다. 그 사이를 여기서 메운다.
+  # 로컬과 CI 가 같은 러너·같은 .claude/gates.json 을 쓰므로 구현이 갈라지지 않는다.
+  # 목록 확인: python3 .claude/scripts/gate-runner.py --list
+  # 우회: git push --no-verify (사유를 PR 설명에 남길 것)
+  - repo: local
+    hooks:
+      - id: gate-runner-pre-push
+        name: 통합 게이트 (pre-push)
+        entry: python3 .claude/scripts/gate-runner.py --stage pre-push
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+        verbose: true

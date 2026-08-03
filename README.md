@@ -21,6 +21,8 @@ AI 에이전트(Claude Code)가 신뢰할 수 있는 결과물을 생산하도�
 | 구조 지식 | codegraph 인덱스 | 심볼 위치·호출 경로·영향 범위 (실시간, 문서화하지 않음) |
 | 의미 지식 | `DOMAIN.md` + `{app}/DOMAIN.md` | 상태값의 뜻·시그널 부수효과·용어·내부 슬랭 |
 | 지식 가드레일 | `.claude/scripts/domain-*.py` | 의미 변화 감지 → 문서 갱신 강제 (훅·pre-commit·CI) |
+| 게이트 파이프라인 | `.claude/gates.json` + `gate-runner.py` | 시점별 검사 선언. pre-push와 CI가 같은 러너를 써서 드리프트 차단 |
+| 게이트 자가진단 | `.claude/hooks/gate-selftest.sh` | 훅이 실제로 발화하는지 매 세션 실측 |
 | 참고 문서 | `docs/` | 아키텍처·정책·분석·배포·트러블슈팅·API 문서 (서브디렉토리 구조) |
 | CI/CD | `.github/workflows/` | PR 테스트·코드 리뷰·문서화 |
 
@@ -84,7 +86,8 @@ bash ~/harness-init/init.sh
 5. **스택 마이그레이션** — 비 Django 스택이면 `migration.sh`가 내용을 해당 스택으로 자동 변환
 6. **구조 지식 계층** — `codegraph-setup.sh`가 인덱싱 + MCP 등록 (`.mcp.json`). codegraph 미설치면 안내 후 건너뜀
 7. **의미 지식 계층** — `domain-init.sh`가 AST로 Choices·시그널·db_table을 추출해 스켈레톤 생성. `domain-fill.sh`가 시그널 부수효과만 요약 (Claude Code 필요, 없으면 건너뜀)
-8. **LSP 설정 주입** — 선택된 언어/감지된 스택에 따라 `settings.json`에 LSP 서버 설정 자동 추가 (Python → `pylsp`, JS/TS → `typescript-language-server`)
+8. **게이트 파이프라인** — `.claude/gates.json`(스택별 기본값) + `gate-runner.py` 설치, pre-commit 에 pre-push 통합 게이트 등록. 기존 설정이 있으면 `repos:` 뒤에 끼워 넣고 유효하지 않으면 되돌림
+9. **LSP 설정 주입** — 선택된 언어/감지된 스택에 따라 `settings.json`에 LSP 서버 설정 자동 추가 (Python → `pylsp`, JS/TS → `typescript-language-server`)
 
 > `ENV_TYPE=js bash ~/harness-init/init.sh` 처럼 환경변수로 사전 지정하면 프롬프트 없이 실행됩니다 (CI/CD 등 비대화형 환경 지원).
 
@@ -135,9 +138,11 @@ my-project/
 │   │   ├── domain-extract.py        ← AST로 Choices·시그널·db_table 추출
 │   │   ├── domain-gate.py           ← 의미 변화 판정 (훅·pre-commit·CI 공용)
 │   │   ├── domain-freshness.py      ← DOMAIN.md 신선도 측정
-│   │   └── hook-io.py               ← 훅 페이로드 파싱 + 발화 기록 (전 훅 공용)
+│   │   ├── hook-io.py               ← 훅 페이로드 파싱 + 발화 기록 (전 훅 공용)
+│   │   └── gate-runner.py           ← ★ 게이트 러너 (pre-push·CI 공용)
 │   ├── decisions/
 │   │   └── adr-template.md
+│   ├── gates.json                     ← ★ 게이트 선언 (pre-push·CI 공용, 프로젝트 소유)
 │   └── settings.json
 ├── .gemini/                          ← Gemini Code Assist 설정
 ├── .github/
@@ -194,6 +199,93 @@ echo "$HOOK_COMMAND" | grep -q '위험패턴' && ...
 프로젝트별 훅을 추가하려면 `.claude/hooks/`에 `.sh` 파일을 추가하고 `settings.json`의
 `hooks` 섹션에 등록하세요. 하네스 소유 훅(위 표의 7개 + `_hook-input.sh`)은 재실행 시
 **덮어쓰기 대상**이므로 직접 수정하지 말고 별도 파일로 추가하세요.
+
+---
+
+## 게이트 파이프라인 — 언제 무엇이 도는가
+
+검사는 실패를 가장 이른 시점에 잡도록 배열합니다. 각 시점에 주인이 하나씩 있습니다.
+
+| 시점 | 무엇이 도는가 | 담당 | 실패하면 |
+|---|---|---|---|
+| 세션 시작 | 게이트 자가진단, 낡은 DOMAIN.md 목록 | `gate-selftest.sh`, `session-knowledge.sh` | 경고 후 진행 |
+| 편집 직후 | 의미 변화 판정 | `domain-guard.sh` | 갱신 지시 (exit 2) |
+| 커밋 직전 | 포맷·린트 자동수정, 문서 미갱신 | `.pre-commit-config.yaml` | 커밋 차단 |
+| **push 직전** | **레포 단위 통합 검사** | **`gate-runner --stage pre-push`** | **push 차단** |
+| CI | 같은 통합 검사 | `gate-runner --stage ci` | 머지 불가 |
+
+핵심은 마지막 두 줄이 **같은 러너와 같은 `.claude/gates.json`** 을 쓴다는 점입니다. 구현이
+하나라서 "로컬은 통과했는데 CI가 깨지는" 드리프트가 구조적으로 생기지 않습니다.
+
+### 역할 분담
+
+- **pre-commit**: 파일 단위, 빠름, 자동수정. 변경된 파일만 봅니다.
+- **pre-push / CI**: 레포 단위, 느려도 됨, 수정 안 함. 전체를 봅니다.
+
+이 구분이 없으면 커밋마다 전체 테스트가 돌아 아무도 안 씁니다.
+
+### 게이트 선언
+
+`.claude/gates.json` 한 곳에만 씁니다. 스택에 맞는 기본값을 `init.sh`가 깔고, 이후는
+프로젝트 것입니다 (재실행해도 덮어쓰지 않습니다).
+
+```json
+{
+  "gates": [
+    {
+      "name": "lint (ruff)",
+      "cmd": "ruff check .",
+      "stages": ["pre-push", "ci"],
+      "requires": "ruff",
+      "requires_file": "tests",
+      "note": "사람이 읽는 설명"
+    }
+  ]
+}
+```
+
+| 필드 | 뜻 |
+|---|---|
+| `stages` | `pre-commit` / `pre-push` / `ci` 중 실행할 시점 |
+| `requires` | 이 실행 파일이 없으면 SKIP |
+| `requires_file` | 이 경로가 없으면 SKIP (문자열 또는 배열) |
+| `allow_failure` | true면 실패해도 계속 |
+
+```bash
+python3 .claude/scripts/gate-runner.py --list                    # 목록
+python3 .claude/scripts/gate-runner.py --stage pre-push          # 실행
+python3 .claude/scripts/gate-runner.py --stage ci --no-fail-fast # 전부 실행
+```
+
+**JSON인 이유**: PyYAML은 표준 라이브러리가 아닙니다. 하네스는 남의 레포에 들어가므로,
+인터프리터 업그레이드 한 번에 사라질 수 있는 의존성을 게이트 경로에 둘 수 없습니다.
+실제로 `~/.claude`의 규칙 레지스트리가 brew python 3.14 업그레이드로 PyYAML을 잃고
+전 규칙이 무음 통과한 사례가 있습니다. 주석을 못 쓰는 불편은 `note` 필드로 갚습니다.
+
+### SKIP은 PASS가 아닙니다
+
+도구가 없어 건너뛴 검사를 통과로 세면, 아무것도 설치 안 된 환경에서 전 항목 초록불이
+뜹니다. SKIP은 별도로 세고 요약에서 이름까지 다시 부릅니다.
+
+```
+  PASS 0 · FAIL 0 · SKIP 3   (총 0.0초)
+  ⚠ SKIP 3건은 통과가 아닙니다: lint (ruff), format check (ruff), tests (pytest)
+  ⚠ 실행된 게이트가 없습니다 — 이 push 는 아무것도 검증되지 않았습니다.
+```
+
+전부 SKIP이면 종료 코드는 0이지만 아무것도 검사하지 않은 것입니다. 도구 없는 머신에서
+push를 통째로 막는 건 과하므로 통과시키되, 이 상태를 조용히 넘기지는 않습니다.
+
+### 종료 코드
+
+| 코드 | 뜻 |
+|---|---|
+| 0 | 전 게이트 통과 (SKIP 포함) |
+| 1 | 게이트 실패 — 고쳐야 함 |
+| 2 | `gates.json` 손상 등 내부 오류 — 하네스가 깨진 것 |
+
+우회는 `git push --no-verify`로 가능하지만 표면화 대상입니다. 우회했으면 PR 설명에 사유를
+남기고, CI에서 같은 게이트가 다시 잡습니다.
 
 ---
 
@@ -604,6 +696,7 @@ harness-init/
     ├── codegraph-setup.sh        ← codegraph 인덱싱 + MCP 등록 (선택 의존성)
     ├── lint-baseline.py          ← 기존 레포의 레거시 ruff 위반을 규칙 단위로 유예
     ├── hook-io.py                ← 훅 페이로드 파싱(parse) + 발화 기록(event)
+    ├── gate-runner.py            ← 선언된 게이트를 시점별 실행 (pre-push·CI 공용)
     ├── migration.sh              ← 스택 감지 + 비 Django 하네스 적응
     └── merge-claude-md.sh        ← CLAUDE.md 주입
 ```
@@ -625,4 +718,7 @@ harness-init/
 | 훅·인사이트 규칙 | `templates/django/.claude/rules/hooks.md` |
 | 에이전트 역할·원칙 | `templates/django/.claude/agents/*.md` |
 | 팀 파이프라인 | `templates/django/.claude/skills/orchestrator/SKILL.md` |
+| 게이트 목록 (pre-push·CI) | 대상 레포의 `.claude/gates.json` |
+| 게이트 기본값 (Python) | `templates/django/.claude/gates.json` |
+| 게이트 기본값 (JS/TS) | `templates/js/.claude/gates.json` |
 | 비 Django 스택 설정 | `scripts/migration.sh` → `configure_stack()` |

@@ -22,6 +22,7 @@ harness-init/
     ├── domain-init.sh      ← DOMAIN.md 스켈레톤 생성
     ├── domain-fill.sh      ← Claude Code로 DOMAIN.md 채우기
     ├── hook-io.py          ← 훅 페이로드 파싱 + 발화 기록 (전 훅 공용, 하네스 소유)
+    ├── gate-runner.py      ← 선언된 게이트를 시점별 실행 (pre-push·CI 공용, 하네스 소유)
     ├── migration.sh        ← 비 Django 스택 마이그레이션
     └── merge-claude-md.sh  ← CLAUDE.md 주입 헬퍼
 ```
@@ -82,6 +83,25 @@ harness-init/
   (`$(dirname "${BASH_SOURCE[0]}")`). 그 변수는 비어 있거나 다른 곳을 가리킬 수 있고,
   그러면 헬퍼를 못 찾은 채 조용히 통과한다.
 - 계측(`hook_event`)은 실패해도 게이트를 막지 않는다. 항상 `|| true` 로 끝낸다.
+
+### 게이트 파이프라인 규칙
+
+검사는 시점(stage)별로 주인이 하나씩이다. 새 검사를 추가할 때 어디에 둘지 먼저 정한다.
+
+- **pre-commit** — 파일 단위·빠름·자동수정. `.pre-commit-config.yaml` 이 담당한다.
+- **pre-push / ci** — 레포 단위·느려도 됨·수정 안 함. `.claude/gates.json` 이 담당한다.
+
+이 구분이 없으면 커밋마다 전체 테스트가 돌아 아무도 안 쓴다.
+
+- pre-push 와 ci 는 **같은 러너·같은 선언**을 쓴다. 한쪽에만 검사를 추가하지 말 것 —
+  그 순간 "로컬은 통과했는데 CI 가 깨지는" 드리프트가 시작된다.
+- `.pre-commit-config.yaml` 에 `default_stages: [pre-commit]` 을 반드시 유지한다.
+  pre-commit 3.x 부터 stages 미지정 훅은 pre-push 를 포함한 모든 시점에서 돈다.
+- pre-push 훅에는 `verbose: true` 를 유지한다. pre-commit 은 성공한 훅의 stdout 을
+  삼키므로, 이게 없으면 "SKIP 은 통과가 아니다" 경고가 전달되지 않는다.
+- 기본 게이트는 **첫날 초록불이 뜨는 것**으로만 구성한다. 깔자마자 빨간불이면 사람들이
+  하네스를 통째로 끈다. 대상이 없는 검사는 `requires`·`requires_file` 로 SKIP 시킨다.
+- 게이트 선언(`gates.json`)은 사용자 소유, 러너(`gate-runner.py`)는 하네스 소유다.
 
 ### settings.json 병합 규칙
 

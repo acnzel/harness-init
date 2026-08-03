@@ -184,6 +184,8 @@ cp "$SCRIPT_DIR/scripts/domain-extract.py" \
    "$SCRIPT_DIR/scripts/hook-io.py" \
    "$SCRIPT_DIR/scripts/gate-runner.py" \
    "$SCRIPT_DIR/scripts/render-agents.py" \
+   "$SCRIPT_DIR/scripts/pr-body.py" \
+   "$SCRIPT_DIR/scripts/commit-msg.py" \
    "$TARGET_DIR/.claude/scripts/" 2>/dev/null || true
 chmod +x "$TARGET_DIR/.claude/scripts/"*.py 2>/dev/null || true
 success "하네스 소유 도구 설치 완료 (.claude/scripts/ — extract/gate/freshness/hook-io/gate-runner)"
@@ -502,7 +504,16 @@ import sys
 
 path = sys.argv[1]
 lines = open(path, encoding="utf-8").read().splitlines(keepends=True)
-block = """  # harness-init 추가 — AGENTS.md 자동 구간 갱신
+block = """  # harness-init 추가 — 커밋 메시지에 브랜치의 티켓 번호 삽입
+  - repo: local
+    hooks:
+      - id: commit-msg-ticket
+        name: 커밋 메시지에 티켓 번호 삽입
+        entry: python3 .claude/scripts/commit-msg.py
+        language: system
+        stages: [commit-msg]
+
+  # harness-init 추가 — AGENTS.md 자동 구간 갱신
   # gates.json·settings.json 을 고치면 문서가 따라온다.
   - repo: local
     hooks:
@@ -558,6 +569,9 @@ PYEOF
       # 설정에만 있고 실제로는 돌지 않는다 (조용히 없는 게이트가 된다).
       (cd "$TARGET_DIR" && pre-commit install --hook-type pre-push) \
         && success "pre-push 통합 게이트 등록 완료"
+      # commit-msg 도 별도 hook-type 이다. 빼먹으면 설정에만 있고 돌지 않는다.
+      (cd "$TARGET_DIR" && pre-commit install --hook-type commit-msg) \
+        && success "commit-msg 티켓 삽입 등록 완료"
     fi
   else
     warn "git 저장소가 아닙니다. 'git init' 후 'pre-commit install' 수동 실행 필요"

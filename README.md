@@ -89,7 +89,8 @@ bash ~/harness-init/init.sh
 7. **의미 지식 계층** — `domain-init.sh`가 AST로 Choices·시그널·db_table을 추출해 스켈레톤 생성. `domain-fill.sh`가 시그널 부수효과만 요약 (Claude Code 필요, 없으면 건너뜀)
 8. **게이트 파이프라인** — `.claude/gates.json`(스택별 기본값) + `gate-runner.py` 설치, pre-commit 에 pre-push 통합 게이트 등록. 기존 설정이 있으면 `repos:` 뒤에 끼워 넣고 유효하지 않으면 되돌림
 9. **문서 정본 계층** — `AGENTS.md` 설치 후 자동 구간(검증 파이프라인·금지 명령)을 `gates.json`·`settings.json` 에서 렌더
-10. **LSP 설정 주입** — 선택된 언어/감지된 스택에 따라 `settings.json`에 LSP 서버 설정 자동 추가 (Python → `pylsp`, JS/TS → `typescript-language-server`)
+10. **PR·커밋 자동화** — CODEOWNERS 골격, 마커 포함 PR 템플릿, commit-msg 티켓 삽입 훅 등록, CI 워크플로를 `gate-runner --stage ci` 로 연결
+11. **LSP 설정 주입** — 선택된 언어/감지된 스택에 따라 `settings.json`에 LSP 서버 설정 자동 추가 (Python → `pylsp`, JS/TS → `typescript-language-server`)
 
 > `ENV_TYPE=js bash ~/harness-init/init.sh` 처럼 환경변수로 사전 지정하면 프롬프트 없이 실행됩니다 (CI/CD 등 비대화형 환경 지원).
 
@@ -143,7 +144,9 @@ my-project/
 │   │   ├── domain-freshness.py      ← DOMAIN.md 신선도 측정
 │   │   ├── hook-io.py               ← 훅 페이로드 파싱 + 발화 기록 (전 훅 공용)
 │   │   ├── gate-runner.py           ← ★ 게이트 러너 (pre-push·CI 공용)
-│   │   └── render-agents.py         ← ★ AGENTS.md 자동 구간 렌더
+│   │   ├── render-agents.py         ← ★ AGENTS.md 자동 구간 렌더
+│   │   ├── pr-body.py               ← ★ PR 본문 자동 수집 구간 (LLM 미사용)
+│   │   └── commit-msg.py            ← ★ 커밋 메시지에 브랜치 티켓 삽입
 │   ├── decisions/
 │   │   └── adr-template.md
 │   ├── gates.json                     ← ★ 게이트 선언 (pre-push·CI 공용, 프로젝트 소유)
@@ -151,7 +154,8 @@ my-project/
 ├── .gemini/                          ← Gemini Code Assist 설정
 ├── .github/
 │   ├── ISSUE_TEMPLATE/
-│   ├── pull_request_template.md
+│   ├── CODEOWNERS                 ← ★ 리뷰어 자동 할당 (전부 주석, 채워서 켤 것)
+│   ├── pull_request_template.md   ← 자동 수집 마커 포함
 │   └── workflows/
 │       ├── claude-code-review.yml   ← PR 자동 리뷰
 │       ├── claude.yml               ← Claude 이슈 처리
@@ -203,6 +207,67 @@ echo "$HOOK_COMMAND" | grep -q '위험패턴' && ...
 프로젝트별 훅을 추가하려면 `.claude/hooks/`에 `.sh` 파일을 추가하고 `settings.json`의
 `hooks` 섹션에 등록하세요. 하네스 소유 훅(위 표의 7개 + `_hook-input.sh`)은 재실행 시
 **덮어쓰기 대상**이므로 직접 수정하지 말고 별도 파일로 추가하세요.
+
+---
+
+## PR·커밋 자동화
+
+### CI 는 로컬과 같은 게이트를 돈다
+
+`pr-test.yml` 은 테스트 명령을 직접 적지 않고 `gate-runner --stage ci` 를 호출합니다.
+검사를 추가하려면 워크플로가 아니라 `.claude/gates.json` 을 고칩니다. 로컬 pre-push 와
+CI 가 같은 선언을 읽으므로 갈라질 수 없습니다.
+
+CI 에서는 `--no-fail-fast` 로 실패를 한 번에 다 보여줍니다. 하나씩 고치며 재실행하는
+것보다 낫습니다. 로컬 pre-push 는 반대로 fail-fast 가 기본입니다.
+
+이전 워크플로는 `branches: [dev]` 가 하드코딩돼 있어 `main`/`develop` 을 쓰는 대부분의
+레포에서 **아예 돌지 않았습니다.** 이제 브랜치를 고정하지 않습니다.
+
+### PR 본문은 마커 사이만 갱신
+
+```markdown
+<!-- harness:pr:start -->
+(워크플로가 채움: 기준 SHA, 변경 파일, CI 게이트 목록, 하네스 설정 변경 여부)
+<!-- harness:pr:end -->
+
+## 리뷰어에게      ← 사람이 쓴 것, 절대 안 건드림
+```
+
+이전 버전은 본문을 **통째로 덮어썼습니다.** 템플릿을 채워 PR 을 열면 그 내용이 사라졌습니다.
+마커가 없으면 앞에 붙이고 나머지는 보존하며, 마커가 손상되면 잘라내지 않고 덧붙입니다.
+
+**LLM 을 쓰지 않습니다.** 이전에는 OpenAI 로 diff 를 요약했는데, 리뷰어는 diff 를 직접
+읽을 수 있어 얻는 게 적고 환각 위험만 남았습니다. 지금은 git 과 `gates.json` 에서
+기계적으로 얻는 사실만 적습니다 (`domain-drift` 가 LLM 을 뺀 것과 같은 판단). API 키가
+필요 없습니다.
+
+하네스 설정(`gates.json`·`settings.json`·훅·`AGENTS.md`)이 바뀌면 본문에 표시합니다.
+게이트를 약화시키는 변경은 diff 두 줄이라 눈에 잘 안 띄기 때문입니다.
+
+### 커밋 메시지에 티켓 번호
+
+브랜치명에서 `ABC-123` 꼴을 찾아 커밋 제목에 넣습니다. 브랜치는 머지 후 사라지므로
+티켓은 커밋에 남아야 합니다.
+
+```
+feature/DEV-1234-알림  +  "feat: 발송 복원"   →   "feat: [DEV-1234] 발송 복원"
+```
+
+설정이 없습니다. 프로젝트 키를 물어보면 설정 파일이 하나 늘고 그 파일이 낡습니다.
+
+**티켓이 없어도 막지 않습니다.** hotfix·문서 수정처럼 티켓 없는 커밋은 정상이고, 차단하면
+`--no-verify` 를 학습시켜 다른 게이트까지 같이 꺼집니다. merge·revert·fixup 커밋과 이미
+티켓이 있는 메시지도 건드리지 않습니다.
+
+### CODEOWNERS
+
+`.github/CODEOWNERS` 를 **전부 주석 처리된 상태**로 깝니다. 존재하지 않는 핸들을 넣으면
+GitHub 이 오류를 표시하므로, 팀 핸들을 채운 뒤 `#` 을 지워 켜세요.
+
+첫 항목이 하네스 자체(`AGENTS.md`, `.claude/`, 워크플로, pre-commit 설정)입니다. 게이트는
+조용히 약해집니다. 검사 하나를 빼는 변경은 diff 두 줄이라 눈에 안 띄므로, 하네스를 리뷰
+대상에 넣어야 그 변경이 사람 눈을 거칩니다.
 
 ---
 
@@ -752,6 +817,8 @@ harness-init/
     ├── hook-io.py                ← 훅 페이로드 파싱(parse) + 발화 기록(event)
     ├── gate-runner.py            ← 선언된 게이트를 시점별 실행 (pre-push·CI 공용)
     ├── render-agents.py          ← AGENTS.md 자동 구간을 설정에서 렌더
+    ├── pr-body.py                ← PR 본문 자동 수집 구간 생성·병합
+    ├── commit-msg.py             ← 브랜치의 티켓 번호를 커밋 메시지에 삽입
     ├── migration.sh              ← 스택 감지 + 비 Django 하네스 적응
     └── merge-claude-md.sh        ← CLAUDE.md 주입
 ```
@@ -778,4 +845,6 @@ harness-init/
 | 게이트 목록 (pre-push·CI) | 대상 레포의 `.claude/gates.json` |
 | 게이트 기본값 (Python) | `templates/django/.claude/gates.json` |
 | 게이트 기본값 (JS/TS) | `templates/js/.claude/gates.json` |
+| 리뷰어 할당 | 대상 레포의 `.github/CODEOWNERS` |
+| PR 본문 자동 수집 항목 | `scripts/pr-body.py` |
 | 비 Django 스택 설정 | `scripts/migration.sh` → `configure_stack()` |

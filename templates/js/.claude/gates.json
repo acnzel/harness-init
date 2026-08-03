@@ -15,26 +15,52 @@
     {
       "name": "lint (eslint)",
       "cmd": "npx --no-install eslint .",
-      "stages": ["pre-push", "ci"],
+      "stages": [
+        "pre-push",
+        "ci"
+      ],
       "requires": "npx",
-      "requires_file": ["package.json", "node_modules"],
+      "requires_file": [
+        "package.json",
+        "node_modules"
+      ],
       "note": "--no-install 로 암묵적 네트워크 다운로드를 막는다. node_modules 가 없으면 SKIP."
     },
     {
       "name": "typecheck (tsc)",
       "cmd": "npx --no-install tsc --noEmit",
-      "stages": ["pre-push", "ci"],
+      "stages": [
+        "pre-push",
+        "ci"
+      ],
       "requires": "npx",
-      "requires_file": ["tsconfig.json", "node_modules"],
+      "requires_file": [
+        "tsconfig.json",
+        "node_modules"
+      ],
       "note": "TypeScript 프로젝트가 아니면 tsconfig.json 이 없어 SKIP."
     },
     {
       "name": "tests",
       "cmd": "npm test --silent --if-present",
-      "stages": ["pre-push", "ci"],
+      "stages": [
+        "pre-push",
+        "ci"
+      ],
       "requires": "npm",
-      "requires_file": ["package.json", "node_modules"],
+      "requires_file": [
+        "package.json",
+        "node_modules"
+      ],
       "note": "--if-present 라 test 스크립트가 없으면 성공으로 끝난다."
+    },
+    {
+      "name": "AGENTS.md 자동 구간 최신",
+      "cmd": "python3 .claude/scripts/render-agents.py --repo . --check",
+      "stages": [
+        "ci"
+      ],
+      "note": "pre-commit 훅을 우회했거나 설치하지 않은 기여자를 CI 에서 잡는다."
     }
   ]
 }

@@ -55,16 +55,20 @@ REDACTIONS = (
 
 
 # mysql 계열의 붙여쓰는 `-pPASSWORD`. 앞에 `-` 가 오면(`--password`, `--profile`)
-# 걸리지 않게 하고, DB 클라이언트를 부르는 명령에서만 적용한다. 전역으로 걸면
-# `find -print` 나 `aws --profile` 까지 가려져 로그를 못 읽게 된다.
-DB_CLIENT_RE = re.compile(r"\b(mysql|mysqldump|mariadb|psql|pg_dump)\b")
+# 걸리지 않게 하고, mysql 계열 명령에서만 적용한다. 전역으로 걸면 `find -print` 나
+# `aws --profile` 까지 가려져 로그를 못 읽게 된다.
+#
+# psql·pg_dump 는 여기 넣지 않는다. PostgreSQL 에서 `-p` 는 비밀번호가 아니라
+# **포트**라, 포함시키면 `psql -p 5432` 의 포트가 가려져 로그만 망가진다.
+# PostgreSQL 자격증명은 위의 `--password` 와 PGPASSWORD 대입 규칙이 잡는다.
+MYSQL_CLIENT_RE = re.compile(r"\b(mysql|mysqldump|mariadb)\b")
 MYSQL_PW_RE = re.compile(r"(?<![-\w])(-p)(?=\S)([^\s'\"]+)")
 
 
 def redact(text):
     for pattern, replacement in REDACTIONS:
         text = pattern.sub(replacement, text)
-    if DB_CLIENT_RE.search(text):
+    if MYSQL_CLIENT_RE.search(text):
         text = MYSQL_PW_RE.sub(r"\1***", text)
     return text
 

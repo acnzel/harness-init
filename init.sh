@@ -507,11 +507,15 @@ if [ -n "$PRECOMMIT_YAML" ] && [ -f "$PRECOMMIT_YAML" ]; then
       PC_CONFIG="$TARGET_DIR/.pre-commit-config.yaml"
       if [ -f "$PC_CONFIG" ] && ! grep -q 'gate-runner-pre-push' "$PC_CONFIG"; then
         cp "$PC_CONFIG" "$PC_CONFIG.harness-bak"
+        # 이 스크립트는 set -e 로 돈다. 아래 python 이 exit 1 을 내면 그대로 설치가
+        # 중단되고, 정작 알리려던 경고도 못 나온 채 백업 파일만 남는다.
+        # `|| _pc_inserted=$?` 로 감싸 종료 상태를 직접 받는다.
+        _pc_inserted=0
         # EOF 에 덧붙이지 않고 `repos:` 바로 뒤에 끼운다. 파일 끝이 항상 repos
         # 리스트라는 보장이 없다 — `ci:` 같은 최상위 키가 뒤에 오면 덧붙인
         # 블록이 그 키 밑으로 들어가 YAML 이 깨진다 (실측으로 확인).
         # YAML 을 파싱해 재덤프하지 않는 이유는 주석이 전부 날아가기 때문이다.
-        python3 - "$PC_CONFIG" <<'PYEOF'
+        python3 - "$PC_CONFIG" <<'PYEOF' || _pc_inserted=$?
 import sys
 
 path = sys.argv[1]
@@ -561,7 +565,6 @@ for index, line in enumerate(lines):
         sys.exit(0)
 sys.exit(1)
 PYEOF
-        _pc_inserted=$?
         # 삽입 자체가 안 됐으면 파일은 원본 그대로다. 그 상태로 validate-config 를
         # 돌리면 당연히 통과하고, 아무것도 안 했는데 "추가했다"고 보고하게 된다.
         # 인자 없는 validate-config 는 아무것도 검사하지 않고 0 을 돌려주므로

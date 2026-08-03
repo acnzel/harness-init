@@ -1,11 +1,23 @@
 #!/bin/bash
 # PreToolUse(Bash) 훅
 # 위험한 Bash 명령 실행 전 경고를 출력한다.
+#
+# 입력은 stdin JSON 이다. 이전 버전은 `${TOOL_INPUT:-}` 라는 존재하지 않는
+# 환경변수를 읽어서 **한 번도 발화한 적이 없었다** (2026-08-03 실측).
+# 파싱은 _hook-input.sh 에 위임한다 (django 템플릿에서 함께 설치된다).
 
-CMD="${TOOL_INPUT:-}"
+source "$(dirname "${BASH_SOURCE[0]}")/_hook-input.sh"
+
+hook_input_load || exit 0
+
+CMD="$HOOK_COMMAND"
+[ -n "$CMD" ] || exit 0
+
+FIRED=""
 
 # DROP TABLE / TRUNCATE TABLE 경고
 if echo "$CMD" | grep -qiE "(DROP TABLE|TRUNCATE TABLE)"; then
+  FIRED="$FIRED drop-table"
   echo ""
   echo "🚨 파괴적 SQL 감지: DROP TABLE / TRUNCATE TABLE"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -17,6 +29,7 @@ fi
 
 # WHERE 없는 DELETE 경고
 if echo "$CMD" | grep -qiE "DELETE[[:space:]]+FROM[[:space:]]+[a-zA-Z_]+" && ! echo "$CMD" | grep -qi -w "WHERE"; then
+  FIRED="$FIRED delete-no-where"
   echo ""
   echo "⚠️  WHERE 절 없는 DELETE 감지 — 테이블 전체 삭제 위험"
   echo ""
@@ -24,13 +37,20 @@ fi
 
 # rm -rf node_modules 이외의 rm -rf 경고
 if echo "$CMD" | grep -qE "rm\s+-rf?\s+" && ! echo "$CMD" | grep -q "node_modules"; then
+  FIRED="$FIRED rm-rf"
   echo ""
   echo "⚠️  rm -rf 감지 — 삭제 대상을 다시 확인하세요."
   echo ""
 fi
 
 # prisma migrate 없이 prisma db push (돌이킬 수 없는 스키마 반영)
-if echo "$CMD" | grep -q "prisma db push" && ! echo "$CMD" | grep -q "--preview-feature\|--accept-data-loss"; then
+#
+# `--` 로 옵션 파싱을 끊는다. BSD grep(macOS)은 `--accept-data-loss` 를 패턴이 아니라
+# 자기 옵션으로 읽어 usage 를 뱉고 실패한다. 그러면 `!` 때문에 면제 플래그를 붙여도
+# 경고가 그대로 떠서, 면제가 아예 동작하지 않는다. 훅이 죽어 있던 동안 드러나지
+# 않았던 버그다 (2026-08-03).
+if echo "$CMD" | grep -q "prisma db push" && ! echo "$CMD" | grep -qE -- "--preview-feature|--accept-data-loss"; then
+  FIRED="$FIRED prisma-db-push"
   echo ""
   echo "⚠️  prisma db push 실행 전 체크리스트"
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -41,3 +61,8 @@ if echo "$CMD" | grep -q "prisma db push" && ! echo "$CMD" | grep -q "--preview-
   echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   echo ""
 fi
+
+# 발화를 기록한다. 게이트의 침묵이 '안전'인지 '고장'인지는 기록이 있어야 구분된다.
+[ -n "$FIRED" ] && hook_event gate_fired pre-bash-guard.sh "$FIRED |$CMD"
+
+exit 0

@@ -21,6 +21,7 @@ harness-init/
 └── scripts/
     ├── domain-init.sh      ← DOMAIN.md 스켈레톤 생성
     ├── domain-fill.sh      ← Claude Code로 DOMAIN.md 채우기
+    ├── hook-io.py          ← 훅 페이로드 파싱 + 발화 기록 (전 훅 공용, 하네스 소유)
     ├── migration.sh        ← 비 Django 스택 마이그레이션
     └── merge-claude-md.sh  ← CLAUDE.md 주입 헬퍼
 ```
@@ -64,6 +65,24 @@ harness-init/
 
 **harness-init은 이 중 무엇도 설치하지 않는다.** 전역 체계는 `~/.claude` 저장소가 머신 간에 전파하고, harness-init은 프로젝트별 `.claude/` 스캐폴딩만 담당한다. 이 경계를 넘지 말 것 — 넘는 순간 같은 규칙이 두 곳에서 배달된다.
 
+### 훅 작성 규칙
+
+**훅 입력은 stdin JSON 이다.** `$TOOL_INPUT` 같은 환경변수는 존재하지 않는다. 이걸 읽는
+훅은 조용히 아무것도 감지하지 못한 채 통과하며, 발화 기록이 없으면 아무도 모른다
+(pre-bash-guard.sh 가 실제로 그 상태였다 — 2026-08-03 실측 확인).
+
+- 파싱은 `_hook-input.sh` 의 `hook_input_load` 에만 둔다. 훅에서 직접 JSON 을 까지 말 것 —
+  훅마다 각자 파싱하면 같은 불일치가 재발한다.
+- `settings.json` 에 **인라인 셸 훅을 넣지 말 것**. JSON 이스케이프 안에서는 stdin 파싱이
+  불가능해 필연적으로 환경변수를 읽게 된다. 파일 훅으로 만들고 경로만 등록한다.
+- 새 게이트를 추가하면 `gate-selftest.sh` 에 **positive/negative 쌍**을 함께 추가한다.
+  한쪽만 검사하면 항상 발화하는 훅도 정상으로 통과한다. 발화 증명 없는 게이트는
+  없는 게이트와 같다.
+- 판정기·헬퍼 경로는 `CLAUDE_PROJECT_DIR` 이 아니라 **스크립트 자신의 위치**에서 찾는다
+  (`$(dirname "${BASH_SOURCE[0]}")`). 그 변수는 비어 있거나 다른 곳을 가리킬 수 있고,
+  그러면 헬퍼를 못 찾은 채 조용히 통과한다.
+- 계측(`hook_event`)은 실패해도 게이트를 막지 않는다. 항상 `|| true` 로 끝낸다.
+
 ### settings.json 병합 규칙
 
 프로젝트 `.claude/settings.json`에 훅/LSP 설정을 추가할 때 `python3`으로 JSON 병합:
@@ -80,7 +99,16 @@ harness-init/
 - 기존 변수명과 함수명 스타일을 따른다.
 
 ### 멱등성 (Idempotency)
-- 모든 파일 복사는 `-n` (no-overwrite) 플래그 사용. 재실행 시 기존 설정 파괴 금지.
+- **사용자 소유** 파일 복사는 `-n` (no-overwrite). 재실행 시 기존 설정 파괴 금지.
+- **하네스 소유** 파일은 반대로 `cp -f` 로 덮어쓴다. 사용자가 편집하는 설정이 아니라
+  훅·pre-commit·에이전트가 함께 호출하는 코드라, 버전이 어긋나면 게이트가 조용히
+  오작동한다. `-n` 이면 버그를 고쳐도 기존 설치에 영원히 전파되지 않는다 —
+  실제로 pre-bash-guard.sh 의 `$TOOL_INPUT` 버그가 그렇게 방치됐다 (2026-08-03).
+  - `.claude/scripts/*.py` 전부
+  - `.claude/hooks/` 중 init.sh 의 `_owned` 목록에 있는 것
+  - 목록 밖의 `.sh` 는 사용자가 추가한 훅이므로 `-n` 이 보존한다
+- settings.json 처럼 사용자 편집과 하네스 등록이 섞이는 파일은 덮어쓰지 말고
+  python3 로 **멱등 병합**한다 (`_inject_gate_selftest` 참조).
 - 디렉토리 생성은 `mkdir -p` 사용.
 
 ### 에러 처리
@@ -102,3 +130,5 @@ harness-init/
 - [ ] README.md에 기능 설명 섹션 추가
 - [ ] CLAUDE.md(harness-init 자체)의 관련 섹션 업데이트
 - [ ] 멱등성 확인 (재실행해도 안전한지)
+- [ ] 게이트·훅을 추가했으면 `gate-selftest.sh` 에 positive/negative 쌍 추가
+- [ ] 기존 설치에도 전파되는지 확인 (하네스 소유면 `cp -f`, settings.json 이면 멱등 병합)

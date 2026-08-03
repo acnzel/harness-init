@@ -148,11 +148,22 @@ cp -rn "$TEMPLATE_DIR/django/.claude/commands/"* "$TARGET_DIR/.claude/commands/"
 success "commands 설치 완료"
 
 # hooks 복사
+#
+# 하네스 소유 훅은 -n 이 아니라 **덮어쓴다**. 도메인 지식 도구와 같은 이유다:
+# 훅이 조용히 고장나면 아무도 모른 채 "게이트가 걸리겠지"라고 믿고 작업한다.
+# 실제로 pre-bash-guard.sh 는 존재하지 않는 $TOOL_INPUT 을 읽어 한 번도 발화하지
+# 않았는데, -n 때문에 재실행해도 고쳐진 버전이 전파되지 않았다 (2026-08-03).
+# 사용자가 추가한 훅(아래 목록 밖의 .sh)은 -n 이 보존한다.
 if [ -d "$TEMPLATE_DIR/django/.claude/hooks" ]; then
   mkdir -p "$TARGET_DIR/.claude/hooks"
   cp -rn "$TEMPLATE_DIR/django/.claude/hooks/"* "$TARGET_DIR/.claude/hooks/" 2>/dev/null || true
+  for _owned in _hook-input.sh gate-selftest.sh pre-bash-guard.sh post-bash-notice.sh \
+                domain-guard.sh session-knowledge.sh insight-collector.sh notification.sh; do
+    [ -f "$TEMPLATE_DIR/django/.claude/hooks/$_owned" ] && \
+      cp -f "$TEMPLATE_DIR/django/.claude/hooks/$_owned" "$TARGET_DIR/.claude/hooks/$_owned" 2>/dev/null || true
+  done
   chmod +x "$TARGET_DIR/.claude/hooks/"*.sh 2>/dev/null || true
-  success "hooks 설치 완료"
+  success "hooks 설치 완료 (하네스 소유 훅은 최신으로 갱신)"
 fi
 
 # rules 복사 (CLAUDE.md @imports 참조 대상)
@@ -170,9 +181,10 @@ mkdir -p "$TARGET_DIR/.claude/scripts"
 cp "$SCRIPT_DIR/scripts/domain-extract.py" \
    "$SCRIPT_DIR/scripts/domain-gate.py" \
    "$SCRIPT_DIR/scripts/domain-freshness.py" \
+   "$SCRIPT_DIR/scripts/hook-io.py" \
    "$TARGET_DIR/.claude/scripts/" 2>/dev/null || true
 chmod +x "$TARGET_DIR/.claude/scripts/"*.py 2>/dev/null || true
-success "도메인 지식 도구 설치 완료 (.claude/scripts/ — extract/gate/freshness)"
+success "도메인 지식 도구 설치 완료 (.claude/scripts/ — extract/gate/freshness/hook-io)"
 
 PROJECT_NAME=$(basename "$TARGET_DIR")
 
@@ -182,6 +194,69 @@ if [ ! -f "$TARGET_DIR/.claude/settings.json" ]; then
   success "settings.json 생성 완료"
 else
   warn ".claude/settings.json 이미 존재, 건너뜀"
+fi
+
+# ── 게이트 자가진단 주입 ─────────────────────────────────
+# settings.json 은 '없을 때만' 생성되므로, 기존 설치는 훅 파일이 갱신돼도
+# 자가진단이 등록되지 않는다. 여기서 멱등 병합한다 (CLAUDE.md 병합 규칙: python3만).
+# 함께 하는 일: 죽은 인라인 $TOOL_INPUT 훅을 파일 훅으로 교체 (마이그레이션).
+_inject_gate_selftest() {
+  python3 - "$TARGET_DIR/.claude/settings.json" << 'PYEOF'
+import json, sys
+
+path = sys.argv[1]
+try:
+    with open(path) as f:
+        settings = json.load(f)
+except (OSError, ValueError):
+    sys.exit(0)
+
+SELFTEST = ".claude/hooks/gate-selftest.sh"
+NOTICE = ".claude/hooks/post-bash-notice.sh"
+changed = False
+hooks = settings.setdefault("hooks", {})
+
+
+def each_hook():
+    for groups in hooks.values():
+        if not isinstance(groups, list):
+            continue
+        for group in groups:
+            if not isinstance(group, dict):
+                continue
+            for hook in group.get("hooks", []):
+                if isinstance(hook, dict):
+                    yield hook
+
+
+# 1) SessionStart 최상단에 자가진단 등록. 게이트가 죽었다면 다른 무엇보다 먼저 알아야 한다.
+if not any(h.get("command") == SELFTEST for h in each_hook()):
+    hooks.setdefault("SessionStart", []).insert(
+        0, {"hooks": [{"type": "command", "command": SELFTEST, "timeout": 15}]}
+    )
+    changed = True
+
+# 2) 존재하지 않는 $TOOL_INPUT 을 읽던 인라인 훅을 파일 훅으로 교체한다.
+#    'gh pr create' 를 함께 확인해 하네스가 심은 그 훅만 건드린다 —
+#    사용자가 직접 쓴 인라인 훅을 우리 것으로 덮어쓰지 않기 위해서다.
+for hook in each_hook():
+    command = str(hook.get("command", ""))
+    if "$TOOL_INPUT" in command and "gh pr create" in command:
+        hook["command"] = NOTICE
+        changed = True
+
+if changed:
+    with open(path, "w") as f:
+        json.dump(settings, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    print("changed")
+PYEOF
+}
+
+if [ -f "$TARGET_DIR/.claude/settings.json" ]; then
+  if [ -n "$(_inject_gate_selftest)" ]; then
+    success "게이트 자가진단 등록 완료 (SessionStart — 훅이 살아있는지 매 세션 실측)"
+  fi
 fi
 
 # ── LSP 설정 주입 ────────────────────────────────────────

@@ -117,9 +117,12 @@ my-project/
 │   │   └── workflows/
 │   │       └── gemini-review.md     ← /workflows:gemini-review
 │   ├── hooks/
+│   │   ├── _hook-input.sh             ← ★ 훅 페이로드 파싱 공용 헬퍼 (source 전용)
+│   │   ├── gate-selftest.sh           ← ★ 게이트가 살아있는지 실측 (SessionStart)
 │   │   ├── pre-bash-guard.sh          ← migrate/DROP/WHERE없는DELETE 전 경고 (PreToolUse)
 │   │   ├── session-knowledge.sh       ← codegraph 동기화 + 낡은 DOMAIN.md 경고 (SessionStart)
 │   │   ├── domain-guard.sh            ← 의미 변화 감지 → 갱신 지시 (PostToolUse, exit 2)
+│   │   ├── post-bash-notice.sh        ← gh pr create 직후 /review 안내 (PostToolUse)
 │   │   ├── insight-collector.sh       ← ★ Insight 블록 자동 수집 → .claude/insights.md
 │   │   └── notification.sh            ← 작업 완료 시 OS 알림 (macOS/Linux/터미널 벨)
 │   ├── rules/
@@ -131,7 +134,8 @@ my-project/
 │   ├── scripts/
 │   │   ├── domain-extract.py        ← AST로 Choices·시그널·db_table 추출
 │   │   ├── domain-gate.py           ← 의미 변화 판정 (훅·pre-commit·CI 공용)
-│   │   └── domain-freshness.py      ← DOMAIN.md 신선도 측정
+│   │   ├── domain-freshness.py      ← DOMAIN.md 신선도 측정
+│   │   └── hook-io.py               ← 훅 페이로드 파싱 + 발화 기록 (전 훅 공용)
 │   ├── decisions/
 │   │   └── adr-template.md
 │   └── settings.json
@@ -166,13 +170,105 @@ my-project/
 
 | 훅 파일 | 이벤트 | 동작 |
 |--------|--------|------|
+| `gate-selftest.sh` | SessionStart | 게이트가 실제로 발화하는지 실측. 죽었으면 세션 시작 시 경고 |
 | `pre-bash-guard.sh` | PreToolUse(Bash) | `manage.py migrate` · `DROP TABLE` · WHERE 없는 `DELETE` 실행 전 경고 출력 |
 | `session-knowledge.sh` | SessionStart | codegraph 인덱스 증분 동기화 + 소스보다 뒤처진 DOMAIN.md 목록을 컨텍스트로 주입 |
 | `domain-guard.sh` | PostToolUse(Edit/Write) | 편집한 파일 하나만 판정. 의미 변화 감지 시 exit 2로 DOMAIN.md 갱신 지시 |
+| `post-bash-notice.sh` | PostToolUse(Bash) | `gh pr create` 직후 `/review` 안내 |
 | `insight-collector.sh` | PostToolUse(Bash/Edit/Write) | Claude 응답의 `★ Insight` 블록을 감지해 `.claude/insights.md`에 자동 저장 |
 | `notification.sh` | Notification | 작업 완료 시 macOS 알림 → Linux notify-send → 터미널 벨 순으로 폴백 |
 
-훅은 `git diff --name-only HEAD`로 변경 파일을 감지합니다. 프로젝트별 훅을 추가하려면 `.claude/hooks/`에 `.sh` 파일을 추가하고 `settings.json`의 `hooks` 섹션에 등록하세요.
+**훅 입력은 stdin JSON 입니다.** Claude Code 는 도구 정보를 환경변수가 아니라 stdin 에
+JSON 으로 넘깁니다. 파싱은 `_hook-input.sh` 의 `hook_input_load` 한 곳에 위임하고, 훅에서
+직접 파싱하지 마세요.
+
+```bash
+source "$(dirname "${BASH_SOURCE[0]}")/_hook-input.sh"
+hook_input_load || exit 0
+echo "$HOOK_COMMAND" | grep -q '위험패턴' && ...
+```
+
+채워지는 변수: `HOOK_PARSE_OK` `HOOK_TOOL` `HOOK_COMMAND` `HOOK_FILE_PATH` `HOOK_SESSION`
+`HOOK_CWD` `HOOK_EVENT` `HOOK_RAW`.
+
+프로젝트별 훅을 추가하려면 `.claude/hooks/`에 `.sh` 파일을 추가하고 `settings.json`의
+`hooks` 섹션에 등록하세요. 하네스 소유 훅(위 표의 7개 + `_hook-input.sh`)은 재실행 시
+**덮어쓰기 대상**이므로 직접 수정하지 말고 별도 파일로 추가하세요.
+
+---
+
+## 게이트 자가진단 — "조용한 게이트"를 신뢰하지 않기
+
+훅은 대부분 fail-open 입니다. 깨져도 조용히 `exit 0` 하고 세션에는 아무 표시가 없습니다.
+그래서 게이트가 조용한 것을 안전으로 읽게 됩니다.
+
+실제로 그랬습니다. `pre-bash-guard.sh` 는 존재하지 않는 `$TOOL_INPUT` 환경변수를 읽고
+있었고, `migrate` · `DROP TABLE` · WHERE 없는 `DELETE` 경고가 **한 번도 발화한 적이
+없었습니다**. 발화 기록이 없으니 아무도 몰랐습니다.
+
+2026-08-03 실측:
+
+| 입력 방식 | 결과 |
+|---|---|
+| stdin JSON (Claude Code 실제 방식) | 무음, `exit 0` — 죽어 있음 |
+| `TOOL_INPUT` 환경변수 강제 주입 | 경고 정상 출력 — 로직은 멀쩡, 배선만 틀림 |
+
+검사가 0건을 반환하는 것은 안전 신호가 아니라 **스캐너가 깨졌다는 신호일 수 있습니다.**
+그래서 세션 시작마다 알려진 케이스로 게이트 자체를 검증합니다.
+
+### positive / negative 쌍으로 판정
+
+한쪽만 보면 안 됩니다. 항상 발화하는 훅도 positive 만으로는 정상 통과합니다.
+
+| 케이스 | 기대 | 위반 시 진단 |
+|---|---|---|
+| `DROP TABLE ...` | 발화 | 게이트 사망 (무음 통과 중) |
+| `git status --short` | 침묵 | 과발화 (아무 때나 떠서 곧 무시당함) |
+
+둘 다 통과해야 "이 게이트는 구분할 줄 안다"가 증명됩니다.
+
+검사 항목은 세 가지입니다.
+
+| 항목 | 판정 |
+|---|---|
+| `hook-io.py parse` | 페이로드 왕복 — 실패하면 전 훅이 동시에 죽습니다 |
+| `pre-bash-guard.sh` | positive/negative 쌍 |
+| `domain-gate.py` | 로딩 가능 여부 (짝인 `domain-extract.py` 누락 = 부분 설치 감지) |
+
+실패하면 세션 시작 시 이렇게 뜹니다.
+
+```
+🚨 [게이트 자가진단 실패]
+
+  ✗ pre-bash-guard.sh — DROP TABLE 이 통과됨 (게이트 사망: 무음 통과 중)
+
+  위 게이트는 무음 통과 중입니다. 차단이 걸릴 것으로 믿고 작업하지 마세요.
+```
+
+통과하면 아무것도 출력하지 않습니다. 수동 점검은 `--verbose` 로 전 항목을 봅니다.
+
+```bash
+bash .claude/hooks/gate-selftest.sh --verbose
+```
+
+### 발화 기록
+
+게이트의 침묵이 '안전'인지 '고장'인지는 기록이 있어야 구분됩니다. 발화·진단 실패를
+`.claude/local/events-YYYY-MM.jsonl` 에 append 합니다 (`.gitignore` 대상, 월별 분할).
+
+```json
+{"ts": "2026-08-03T05:34:33+00:00", "event": "gate_fired", "source": "pre-bash-guard.sh",
+ "tool": "Bash", "session": "...", "detail": " drop-table |mysql -e \"DROP TABLE users;\""}
+```
+
+계측 실패가 게이트를 막아서는 안 되므로 모든 기록 경로는 실패해도 통과합니다.
+자가진단이 주입하는 합성 페이로드는 기록하지 않습니다 (실제 발화 통계 오염 방지).
+
+```bash
+# 이번 달 무엇이 몇 번 발화했나
+python3 -c "import json,collections,sys;print(collections.Counter(json.loads(l)['source'] for l in open(sys.argv[1])))" \
+  .claude/local/events-$(date +%Y-%m).jsonl
+```
 
 ---
 
@@ -507,6 +603,7 @@ harness-init/
     ├── domain-fill.sh            ← 시그널 핸들러 본문을 읽어 부수효과만 요약
     ├── codegraph-setup.sh        ← codegraph 인덱싱 + MCP 등록 (선택 의존성)
     ├── lint-baseline.py          ← 기존 레포의 레거시 ruff 위반을 규칙 단위로 유예
+    ├── hook-io.py                ← 훅 페이로드 파싱(parse) + 발화 기록(event)
     ├── migration.sh              ← 스택 감지 + 비 Django 하네스 적응
     └── merge-claude-md.sh        ← CLAUDE.md 주입
 ```

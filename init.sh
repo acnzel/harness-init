@@ -183,6 +183,7 @@ cp "$SCRIPT_DIR/scripts/domain-extract.py" \
    "$SCRIPT_DIR/scripts/domain-freshness.py" \
    "$SCRIPT_DIR/scripts/hook-io.py" \
    "$SCRIPT_DIR/scripts/gate-runner.py" \
+   "$SCRIPT_DIR/scripts/render-agents.py" \
    "$TARGET_DIR/.claude/scripts/" 2>/dev/null || true
 chmod +x "$TARGET_DIR/.claude/scripts/"*.py 2>/dev/null || true
 success "하네스 소유 도구 설치 완료 (.claude/scripts/ — extract/gate/freshness/hook-io/gate-runner)"
@@ -191,6 +192,18 @@ success "하네스 소유 도구 설치 완료 (.claude/scripts/ — extract/gat
 # 그게 그 팀의 것이 된다. 러너(위)는 덮어쓰고 선언(아래)은 보존한다.
 cp -n "$TEMPLATE_DIR/django/.claude/gates.json" \
       "$TARGET_DIR/.claude/gates.json" 2>/dev/null || true
+
+# AGENTS.md — 플랫폼 중립 정본. 사용자가 절대 규칙을 채워 넣는 문서라 보존한다.
+# 이미 팀이 쓴 AGENTS.md 가 있으면 그대로 두고, 마커가 없으면 렌더러가 건너뛴다.
+cp -n "$TEMPLATE_DIR/django/AGENTS.md" "$TARGET_DIR/AGENTS.md" 2>/dev/null || true
+
+# 기존 설치는 CLAUDE.md(사용자 소유)에 작업 원칙이 남아 있고, 이제 AGENTS.md 에도
+# 같은 내용이 생긴다. 조용히 지우면 사용자가 고친 문장까지 날아가므로 알리기만 한다.
+if [ -f "$TARGET_DIR/CLAUDE.md" ] && grep -q '^### 1\. 코딩 전에 생각하라' "$TARGET_DIR/CLAUDE.md" 2>/dev/null; then
+  warn "CLAUDE.md 의 '코딩 원칙' 이 AGENTS.md 와 중복됩니다."
+  warn "  작업 원칙의 정본은 이제 AGENTS.md 입니다. CLAUDE.md 쪽 섹션을 지우세요."
+  warn "  (같은 규칙이 두 곳에 있으면 한쪽을 고칠 때 다른 쪽이 조용히 낡습니다.)"
+fi
 
 PROJECT_NAME=$(basename "$TARGET_DIR")
 
@@ -489,7 +502,19 @@ import sys
 
 path = sys.argv[1]
 lines = open(path, encoding="utf-8").read().splitlines(keepends=True)
-block = """  # 통합 게이트 (push 직전) — harness-init 추가
+block = """  # harness-init 추가 — AGENTS.md 자동 구간 갱신
+  # gates.json·settings.json 을 고치면 문서가 따라온다.
+  - repo: local
+    hooks:
+      - id: render-agents-md
+        name: AGENTS.md 자동 구간 갱신
+        entry: python3 .claude/scripts/render-agents.py --repo .
+        language: system
+        pass_filenames: false
+        files: '^\\\\.claude/(gates\\\\.json|settings\\\\.json)$|^AGENTS\\\\.md$'
+        stages: [pre-commit]
+
+  # harness-init 추가 — 통합 게이트 (push 직전)
   # 로컬과 CI 가 같은 러너·같은 .claude/gates.json 을 쓴다.
   - repo: local
     hooks:
@@ -620,6 +645,14 @@ if IS_JS_ENV; then
     cp -f "$TEMPLATE_DIR/js/docs/DOC-SYNC-POLICY.md" "$TARGET_DIR/docs/DOC-SYNC-POLICY.md"
     success "JS DOC-SYNC-POLICY.md 적용 완료"
   fi
+fi
+
+# ── AGENTS.md 자동 구간 렌더 ───────────────────────────
+# gates.json 과 settings.json 이 모두 자리를 잡은 뒤에 돌려야 한다 (JS 오버라이드가
+# gates.json 을 바꾸므로 그 뒤). 정본에서 생성하므로 문서가 설정과 어긋날 수 없다.
+if [ -f "$TARGET_DIR/.claude/scripts/render-agents.py" ]; then
+  python3 "$TARGET_DIR/.claude/scripts/render-agents.py" --repo "$TARGET_DIR" >/dev/null 2>&1 \
+    && success "AGENTS.md 자동 구간 렌더 완료 (파이프라인·금지 명령)"
 fi
 
 # ── 구조 지식 계층 (codegraph) ─────────────────────────

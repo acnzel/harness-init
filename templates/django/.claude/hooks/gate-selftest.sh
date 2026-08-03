@@ -148,6 +148,23 @@ JSON
 	fi
 fi
 
+# ── 5. AGENTS.md 자동 구간 신선도 ──────────────────────
+# 문서가 설정과 어긋나면 에이전트가 낡은 파이프라인·금지 목록을 근거로 삼는다.
+# 낡았다는 사실을 모르는 게 낡은 것보다 위험하다.
+RENDER="$SCRIPTS_DIR/render-agents.py"
+if [ ! -f "$RENDER" ]; then
+	skip "render-agents.py 미설치"
+elif [ ! -f "$PROJECT_DIR/AGENTS.md" ]; then
+	skip "AGENTS.md 없음"
+else
+	python3 "$RENDER" --repo "$PROJECT_DIR" --check >/dev/null 2>&1
+	case $? in
+	0) pass "AGENTS.md — 자동 구간이 설정과 일치" ;;
+	1) fail "AGENTS.md — 자동 구간이 낡음 (python3 .claude/scripts/render-agents.py --repo . 로 갱신)" ;;
+	*) fail "AGENTS.md — 마커 손상으로 갱신 불가 (harness:auto 마커를 확인할 것)" ;;
+	esac
+fi
+
 # ── 결과 ───────────────────────────────────────────────
 if [ -n "$FAILURES" ]; then
 	echo ""

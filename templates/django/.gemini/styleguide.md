@@ -2,6 +2,13 @@
 
 이 문서는 Gemini Code Assist가 코드 리뷰 시 참조할 프로젝트 스타일 가이드입니다.
 
+> **정본 관계**: 아래 규칙의 정본은 `.claude/rules/architecture.md`·`testing.md` 다.
+> 이 파일은 Gemini Code Assist 전용 **파생본**이다. Gemini 는 이 파일의 내용만 프롬프트로
+> 받고 다른 파일 참조를 따라가지 못하므로, 참조로 대체하지 않고 내용을 옮겨 적는다.
+> 규칙을 바꾸면 **정본과 이 파일을 같은 커밋에서 함께** 고칠 것. 한쪽만 고치면 리뷰 봇이
+> 낡은 기준으로 지적한다.
+
+
 ## Critical Rules (반드시 준수)
 
 ### 1. Layered Architecture

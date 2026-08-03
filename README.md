@@ -12,7 +12,8 @@ AI 에이전트(Claude Code)가 신뢰할 수 있는 결과물을 생산하도�
 
 | 구성 요소 | 파일/디렉토리 | 역할 |
 |-----------|-------------|------|
-| 지시 아키텍처 | `CLAUDE.md` | 코딩 원칙·레이어 규칙·팀 트리거 조건 |
+| 공통 정본 | `AGENTS.md` | 모든 에이전트(Claude·Codex·Cursor)가 읽는 작업 원칙·권한·경계. 파이프라인/금지 목록은 설정에서 자동 생성 |
+| 지시 아키텍처 | `CLAUDE.md` | Claude Code 전용 보충 — 환경 설정·@import·인사이트 규칙 |
 | 에이전트 팀 | `.claude/agents/` | 역할별 전문 에이전트 5인 |
 | 실행 스킬 | `.claude/skills/` | 작업 유형별 실행 방법 |
 | 슬래시 커맨드 | `.claude/commands/` | `/review` 등 단축 커맨드 |
@@ -87,7 +88,8 @@ bash ~/harness-init/init.sh
 6. **구조 지식 계층** — `codegraph-setup.sh`가 인덱싱 + MCP 등록 (`.mcp.json`). codegraph 미설치면 안내 후 건너뜀
 7. **의미 지식 계층** — `domain-init.sh`가 AST로 Choices·시그널·db_table을 추출해 스켈레톤 생성. `domain-fill.sh`가 시그널 부수효과만 요약 (Claude Code 필요, 없으면 건너뜀)
 8. **게이트 파이프라인** — `.claude/gates.json`(스택별 기본값) + `gate-runner.py` 설치, pre-commit 에 pre-push 통합 게이트 등록. 기존 설정이 있으면 `repos:` 뒤에 끼워 넣고 유효하지 않으면 되돌림
-9. **LSP 설정 주입** — 선택된 언어/감지된 스택에 따라 `settings.json`에 LSP 서버 설정 자동 추가 (Python → `pylsp`, JS/TS → `typescript-language-server`)
+9. **문서 정본 계층** — `AGENTS.md` 설치 후 자동 구간(검증 파이프라인·금지 명령)을 `gates.json`·`settings.json` 에서 렌더
+10. **LSP 설정 주입** — 선택된 언어/감지된 스택에 따라 `settings.json`에 LSP 서버 설정 자동 추가 (Python → `pylsp`, JS/TS → `typescript-language-server`)
 
 > `ENV_TYPE=js bash ~/harness-init/init.sh` 처럼 환경변수로 사전 지정하면 프롬프트 없이 실행됩니다 (CI/CD 등 비대화형 환경 지원).
 
@@ -95,7 +97,8 @@ bash ~/harness-init/init.sh
 
 ```
 my-project/
-├── CLAUDE.md                         ← 코딩 원칙·레이어 규칙·팀 트리거
+├── AGENTS.md                         ← ★ 공통 정본 (전 에이전트) · 자동 구간 포함
+├── CLAUDE.md                         ← Claude 전용 보충 (환경·@import·인사이트)
 ├── .pre-commit-config.yaml           ← pre-commit-hooks + ruff (자동 설치·등록)
 ├── DOMAIN.md                         ← 도메인 인덱스 (기존 프로젝트만)
 ├── {app}/DOMAIN.md                   ← 앱별 도메인 문서 스켈레톤 (기존 프로젝트만)
@@ -139,7 +142,8 @@ my-project/
 │   │   ├── domain-gate.py           ← 의미 변화 판정 (훅·pre-commit·CI 공용)
 │   │   ├── domain-freshness.py      ← DOMAIN.md 신선도 측정
 │   │   ├── hook-io.py               ← 훅 페이로드 파싱 + 발화 기록 (전 훅 공용)
-│   │   └── gate-runner.py           ← ★ 게이트 러너 (pre-push·CI 공용)
+│   │   ├── gate-runner.py           ← ★ 게이트 러너 (pre-push·CI 공용)
+│   │   └── render-agents.py         ← ★ AGENTS.md 자동 구간 렌더
 │   ├── decisions/
 │   │   └── adr-template.md
 │   ├── gates.json                     ← ★ 게이트 선언 (pre-push·CI 공용, 프로젝트 소유)
@@ -199,6 +203,56 @@ echo "$HOOK_COMMAND" | grep -q '위험패턴' && ...
 프로젝트별 훅을 추가하려면 `.claude/hooks/`에 `.sh` 파일을 추가하고 `settings.json`의
 `hooks` 섹션에 등록하세요. 하네스 소유 훅(위 표의 7개 + `_hook-input.sh`)은 재실행 시
 **덮어쓰기 대상**이므로 직접 수정하지 말고 별도 파일로 추가하세요.
+
+---
+
+## 문서 정본 계층 — 복제하지 않고 생성한다
+
+에이전트 도구마다 읽는 파일이 다릅니다. 같은 규칙을 여러 파일에 옮겨 적으면 한쪽을 고칠 때
+다른 쪽이 조용히 낡습니다. 이 레포에도 실제로 그런 중복이 있었습니다.
+
+| 파일 | 누가 읽나 | 무엇을 담나 |
+|---|---|---|
+| `AGENTS.md` | 모든 에이전트 (Claude·Codex·Cursor·OpenCode) | 작업 원칙, 절대 규칙, 권한·경계 |
+| `CLAUDE.md` | Claude Code | 환경 설정, `@import`, 인사이트 규칙 |
+| `.claude/rules/*.md` | 정본을 참조하는 모두 | 아키텍처·테스트·도메인·훅 상세 |
+| `.gemini/styleguide.md` | Gemini Code Assist | 리뷰 기준 (파생본) |
+
+`CLAUDE.md` 는 작업 원칙을 다시 적지 않고 `AGENTS.md` 를 가리킵니다.
+
+### 자동 구간
+
+드리프트를 검사로 잡는 것보다 **드리프트할 대상을 없애는 것**이 쌉니다. `AGENTS.md` 의
+일부는 손으로 쓰지 않고 설정에서 생성합니다.
+
+```markdown
+<!-- harness:auto:start -->
+### 검증 파이프라인     ← .claude/gates.json 에서 생성
+### 금지 명령           ← .claude/settings.json 의 permissions.deny 에서 생성
+<!-- harness:auto:end -->
+```
+
+`gates.json` 을 고치면 pre-commit 훅이 `AGENTS.md` 를 다시 렌더합니다. 문서가 설정과
+어긋날 수 없습니다. 세션 시작 시 자가진단도 신선도를 확인합니다.
+
+```bash
+python3 .claude/scripts/render-agents.py --repo .           # 갱신
+python3 .claude/scripts/render-agents.py --repo . --check    # 낡았으면 exit 1
+```
+
+마커가 한 쌍이 아니거나 순서가 뒤집혀 있으면 **덮어쓰지 않고 실패**합니다. 잘못 자르면
+사람이 쓴 내용이 유실되기 때문입니다.
+
+**금지 명령을 렌더하는 이유**: `settings.json` 의 `deny` 는 Claude Code 에만 적용됩니다.
+Codex·Cursor 는 그 파일을 읽지 않으므로 `AGENTS.md` 에 글로도 있어야 전달됩니다. 중복이
+아니라 다른 청중을 위한 유일한 경로라서, 손으로 옮겨 적는 대신 같은 원본에서 생성합니다.
+
+### 남아 있는 중복
+
+`.gemini/styleguide.md` 는 `.claude/rules/` 의 레이어·테스트 규칙을 다시 씁니다. Gemini
+Code Assist 는 이 파일의 내용만 프롬프트로 받고 파일 참조를 따라가지 못해서, 참조로
+대체하면 리뷰 품질이 떨어집니다. 없앨 수 없는 중복이므로 파일 상단에 정본 관계를 명시하고
+**같은 커밋에서 함께 고칠 것**을 요구합니다.
 
 ---
 
@@ -697,6 +751,7 @@ harness-init/
     ├── lint-baseline.py          ← 기존 레포의 레거시 ruff 위반을 규칙 단위로 유예
     ├── hook-io.py                ← 훅 페이로드 파싱(parse) + 발화 기록(event)
     ├── gate-runner.py            ← 선언된 게이트를 시점별 실행 (pre-push·CI 공용)
+    ├── render-agents.py          ← AGENTS.md 자동 구간을 설정에서 렌더
     ├── migration.sh              ← 스택 감지 + 비 Django 하네스 적응
     └── merge-claude-md.sh        ← CLAUDE.md 주입
 ```
@@ -718,6 +773,8 @@ harness-init/
 | 훅·인사이트 규칙 | `templates/django/.claude/rules/hooks.md` |
 | 에이전트 역할·원칙 | `templates/django/.claude/agents/*.md` |
 | 팀 파이프라인 | `templates/django/.claude/skills/orchestrator/SKILL.md` |
+| 공통 정본 (절대 규칙·권한) | 대상 레포의 `AGENTS.md` |
+| 공통 정본 템플릿 | `templates/django/AGENTS.md` (JS도 이걸 씀) |
 | 게이트 목록 (pre-push·CI) | 대상 레포의 `.claude/gates.json` |
 | 게이트 기본값 (Python) | `templates/django/.claude/gates.json` |
 | 게이트 기본값 (JS/TS) | `templates/js/.claude/gates.json` |

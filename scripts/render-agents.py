@@ -62,7 +62,31 @@ def read_json(path):
         return None
 
 
-def render_pipeline(gates):
+def ci_wired(repo):
+    """어느 워크플로든 러너를 부르는가.
+
+    워크플로는 사용자 소유라 하네스가 덮어쓰지 않는다. 그래서 CI 가 러너를 안 부르는
+    상태가 생길 수 있는데, 그때 이 문서가 "CI 에서 이 게이트들이 돈다"고 적으면
+    거짓말이 된다. 문서가 거짓말하는 것이 문서가 없는 것보다 나쁘다.
+    """
+    workflows = os.path.join(repo, ".github", "workflows")
+    if not os.path.isdir(workflows):
+        return None  # CI 자체가 없음 — 판정 대상 아님
+    for name in os.listdir(workflows):
+        if not name.endswith((".yml", ".yaml")):
+            continue
+        try:
+            if (
+                "gate-runner"
+                in open(os.path.join(workflows, name), encoding="utf-8").read()
+            ):
+                return True
+        except OSError:
+            continue
+    return False
+
+
+def render_pipeline(gates, wired=None):
     lines = ["### 검증 파이프라인", ""]
     if not gates:
         lines += [
@@ -74,7 +98,18 @@ def render_pipeline(gates):
     lines += ["| 시점 | 검사 |", "|---|---|"]
     for stage, label in STAGE_LABELS:
         names = [g["name"] for g in gates if stage in g.get("stages", [])]
-        lines.append(f"| {label} | {', '.join(names) if names else '없음'} |")
+        row = ", ".join(names) if names else "없음"
+        if stage == "ci" and wired is False and names:
+            row += " ⚠️ **CI 미연결**"
+        lines.append(f"| {label} | {row} |")
+
+    if wired is False:
+        lines += [
+            "",
+            "> ⚠️ **어느 워크플로도 `gate-runner` 를 부르지 않습니다.** 위 CI 항목은 선언만 되어",
+            "> 있고 실제로 돌지 않습니다. `.github/workflows/` 중 하나에 아래를 넣으세요:",
+            "> `python3 .claude/scripts/gate-runner.py --stage ci --no-fail-fast`",
+        ]
 
     lines += [
         "",
@@ -127,7 +162,7 @@ def build_block(repo):
         "     직접 편집하지 마세요 — scripts/render-agents.py 가 덮어씁니다. -->",
         "",
     ]
-    lines += render_pipeline(gates)
+    lines += render_pipeline(gates, wired=ci_wired(repo))
     lines += render_forbidden(deny)
     lines.append(MARKER_END)
     return "\n".join(lines)

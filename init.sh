@@ -661,6 +661,27 @@ if IS_JS_ENV; then
   fi
 fi
 
+# ── CI 게이트 연결 확인 ────────────────────────────────
+# 워크플로는 사용자 소유라 cp -rn 이 기존 파일을 보존한다. 그래서 기존 설치는 로컬
+# pre-push 만 러너를 쓰고 CI 는 옛 명령을 돌리는 상태가 된다. 그러면 AGENTS.md 가
+# "CI 에서 이 게이트들이 돈다"고 적어놓고 실제로는 안 도는, 문서가 거짓말하는 상태가 된다.
+# (stadiumDjango 실측에서 실제로 이 상태가 나왔다.)
+# 어느 워크플로도 러너를 부르지 않으면 전용 파일을 하나 추가한다. 기존 워크플로는
+# 건드리지 않는다 — 팀이 손댄 CI 를 말없이 바꾸는 건 더 나쁘다.
+if [ -d "$TARGET_DIR/.github/workflows" ]; then
+  if ! grep -rql 'gate-runner' "$TARGET_DIR/.github/workflows" 2>/dev/null; then
+    _tpl="$TEMPLATE_DIR/django/.github/workflows/pr-test.yml"
+    [ "$ENV_TYPE" = "js" ] && [ -f "$TEMPLATE_DIR/js/.github/workflows/pr-test.yml" ] \
+      && _tpl="$TEMPLATE_DIR/js/.github/workflows/pr-test.yml"
+    if [ -f "$_tpl" ]; then
+      cp -f "$_tpl" "$TARGET_DIR/.github/workflows/harness-gates.yml"
+      success "CI 통합 게이트 워크플로 추가 (.github/workflows/harness-gates.yml)"
+      warn "  기존 워크플로는 그대로 뒀습니다. 테스트가 중복 실행되면"
+      warn "  기존 것을 지우거나 gate-runner 호출로 바꾸세요."
+    fi
+  fi
+fi
+
 # ── AGENTS.md 자동 구간 렌더 ───────────────────────────
 # gates.json 과 settings.json 이 모두 자리를 잡은 뒤에 돌려야 한다 (JS 오버라이드가
 # gates.json 을 바꾸므로 그 뒤). 정본에서 생성하므로 문서가 설정과 어긋날 수 없다.
@@ -781,6 +802,33 @@ echo "  · 이슈 자동 처리 불가 (claude)"
 echo ""
 echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
+
+# ── 설치 직후 게이트 실측 ──────────────────────────────
+# 어떤 게이트가 이 레포에서 통과하는지는 **추측하면 안 된다**. 이미 개발이 진행된
+# 레포에서는 repo-wide 검사가 첫날부터 빨간불일 수 있고, 그러면 첫 push 가 막힌 채
+# 원인을 모른다. 실제로 stadiumDjango 에서 포맷 검사가 44/176 파일로 걸렸다.
+#
+# 여기서 한 번 돌려 현실을 보여준다. 자동으로 게이트를 끄지는 않는다 — 무엇을 포기할지는
+# 사람이 정한다. 덤으로 pre-push 가 앞으로 얼마나 걸릴지도 이때 드러난다.
+if [ -f "$TARGET_DIR/.claude/scripts/gate-runner.py" ] && [ -f "$TARGET_DIR/.claude/gates.json" ]; then
+  echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo -e "${BLUE}  게이트 실측 — 지금 이 레포에서 무엇이 통과하는가${NC}"
+  echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo ""
+  if (cd "$TARGET_DIR" && python3 .claude/scripts/gate-runner.py --stage pre-push --no-fail-fast); then
+    echo ""
+    success "현재 상태에서 pre-push 게이트가 통과합니다."
+  else
+    echo ""
+    warn "위 게이트가 지금 실패합니다 — 이 상태로는 첫 push 가 막힙니다."
+    warn "  둘 중 하나를 하세요:"
+    warn "   1) 코드를 고쳐 통과시킨다"
+    warn "   2) .claude/gates.json 에서 해당 게이트를 빼거나 조건을 좁힌다"
+    warn "  게이트를 빼는 것은 후퇴가 아닙니다. 첫날부터 빨간불이면 팀이 하네스를"
+    warn "  통째로 끄고, 그러면 나머지 게이트까지 같이 사라집니다."
+  fi
+  echo ""
+fi
 
 if [ "$USE_ATLASSIAN_MCP" = "yes" ]; then
   echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"

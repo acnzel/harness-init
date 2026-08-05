@@ -1,0 +1,66 @@
+{
+  "_note": [
+    "게이트 선언 정본. 같은 러너를 pre-push 와 CI 가 호출하므로 여기 한 곳만 고치면 둘 다 따라온다.",
+    "실행: python3 .claude/scripts/gate-runner.py --stage pre-push  (--list 로 목록만)",
+    "",
+    "역할 분담:",
+    "  pre-commit  파일 단위·빠른 검사·자동수정 → .pre-commit-config.yaml 이 담당 (prettier, eslint, domain-gate)",
+    "  pre-push/ci 레포 단위 통합 검사        → 이 파일이 담당",
+    "",
+    "필드: name, cmd, stages(pre-commit|pre-push|ci) 필수 / requires, requires_file, allow_failure, note 선택.",
+    "requires·requires_file 이 없으면 SKIP 이다. SKIP 은 통과가 아니며 요약에 따로 표시된다.",
+    "JSON 인 이유: PyYAML 은 표준 라이브러리가 아니라, 인터프리터 업그레이드 한 번에 게이트가 통째로 죽는다."
+  ],
+  "gates": [
+    {
+      "name": "lint (eslint)",
+      "cmd": "npx --no-install eslint .",
+      "stages": [
+        "pre-push",
+        "ci"
+      ],
+      "requires": "npx",
+      "requires_file": [
+        "package.json",
+        "node_modules"
+      ],
+      "note": "--no-install 로 암묵적 네트워크 다운로드를 막는다. node_modules 가 없으면 SKIP."
+    },
+    {
+      "name": "typecheck (tsc)",
+      "cmd": "npx --no-install tsc --noEmit",
+      "stages": [
+        "pre-push",
+        "ci"
+      ],
+      "requires": "npx",
+      "requires_file": [
+        "tsconfig.json",
+        "node_modules"
+      ],
+      "note": "TypeScript 프로젝트가 아니면 tsconfig.json 이 없어 SKIP."
+    },
+    {
+      "name": "tests",
+      "cmd": "npm test --silent --if-present",
+      "stages": [
+        "pre-push",
+        "ci"
+      ],
+      "requires": "npm",
+      "requires_file": [
+        "package.json",
+        "node_modules"
+      ],
+      "note": "--if-present 라 test 스크립트가 없으면 성공으로 끝난다."
+    },
+    {
+      "name": "AGENTS.md 자동 구간 최신",
+      "cmd": "python3 .claude/scripts/render-agents.py --repo . --check",
+      "stages": [
+        "ci"
+      ],
+      "note": "pre-commit 훅을 우회했거나 설치하지 않은 기여자를 CI 에서 잡는다."
+    }
+  ]
+}

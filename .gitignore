@@ -1,3 +1,7 @@
 .omc/
 .DS_Store
 .claude/rules/
+
+# 파이썬 바이트코드 (스크립트를 레포 안에서 실행하면 생긴다)
+__pycache__/
+*.pyc

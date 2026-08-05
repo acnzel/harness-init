@@ -31,7 +31,8 @@
       "Bash(codegraph sync:*)",
       "Bash(python3 .claude/scripts/domain-gate.py:*)",
       "Bash(python3 .claude/scripts/domain-extract.py:*)",
-      "Bash(python3 .claude/scripts/domain-freshness.py:*)"
+      "Bash(python3 .claude/scripts/domain-freshness.py:*)",
+      "Bash(bash .claude/hooks/gate-selftest.sh:*)"
     ],
     "deny": [
       "Bash(git push --force*)",
@@ -47,6 +48,15 @@
   },
   "hooks": {
     "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/gate-selftest.sh",
+            "timeout": 15
+          }
+        ]
+      },
       {
         "hooks": [
           {
@@ -100,7 +110,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if echo \"$TOOL_INPUT\" | grep -q 'gh pr create'; then echo '\\n📋 PR이 생성되었습니다. /review 를 실행하여 종합 코드 리뷰를 수행하세요.'; fi"
+            "command": ".claude/hooks/post-bash-notice.sh"
           },
           {
             "type": "command",

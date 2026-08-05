@@ -148,11 +148,22 @@ cp -rn "$TEMPLATE_DIR/django/.claude/commands/"* "$TARGET_DIR/.claude/commands/"
 success "commands 설치 완료"
 
 # hooks 복사
+#
+# 하네스 소유 훅은 -n 이 아니라 **덮어쓴다**. 도메인 지식 도구와 같은 이유다:
+# 훅이 조용히 고장나면 아무도 모른 채 "게이트가 걸리겠지"라고 믿고 작업한다.
+# 실제로 pre-bash-guard.sh 는 존재하지 않는 $TOOL_INPUT 을 읽어 한 번도 발화하지
+# 않았는데, -n 때문에 재실행해도 고쳐진 버전이 전파되지 않았다 (2026-08-03).
+# 사용자가 추가한 훅(아래 목록 밖의 .sh)은 -n 이 보존한다.
 if [ -d "$TEMPLATE_DIR/django/.claude/hooks" ]; then
   mkdir -p "$TARGET_DIR/.claude/hooks"
   cp -rn "$TEMPLATE_DIR/django/.claude/hooks/"* "$TARGET_DIR/.claude/hooks/" 2>/dev/null || true
+  for _owned in _hook-input.sh gate-selftest.sh pre-bash-guard.sh post-bash-notice.sh \
+                domain-guard.sh session-knowledge.sh insight-collector.sh notification.sh; do
+    [ -f "$TEMPLATE_DIR/django/.claude/hooks/$_owned" ] && \
+      cp -f "$TEMPLATE_DIR/django/.claude/hooks/$_owned" "$TARGET_DIR/.claude/hooks/$_owned" 2>/dev/null || true
+  done
   chmod +x "$TARGET_DIR/.claude/hooks/"*.sh 2>/dev/null || true
-  success "hooks 설치 완료"
+  success "hooks 설치 완료 (하네스 소유 훅은 최신으로 갱신)"
 fi
 
 # rules 복사 (CLAUDE.md @imports 참조 대상)
@@ -170,9 +181,43 @@ mkdir -p "$TARGET_DIR/.claude/scripts"
 cp "$SCRIPT_DIR/scripts/domain-extract.py" \
    "$SCRIPT_DIR/scripts/domain-gate.py" \
    "$SCRIPT_DIR/scripts/domain-freshness.py" \
+   "$SCRIPT_DIR/scripts/hook-io.py" \
+   "$SCRIPT_DIR/scripts/gate-runner.py" \
+   "$SCRIPT_DIR/scripts/render-agents.py" \
+   "$SCRIPT_DIR/scripts/pr-body.py" \
+   "$SCRIPT_DIR/scripts/commit-msg.py" \
    "$TARGET_DIR/.claude/scripts/" 2>/dev/null || true
 chmod +x "$TARGET_DIR/.claude/scripts/"*.py 2>/dev/null || true
-success "도메인 지식 도구 설치 완료 (.claude/scripts/ — extract/gate/freshness)"
+
+# 복사가 실패하면 기존 설치가 낡은 판정기를 그대로 쓰면서 설치는 성공으로 보고된다.
+# 이 하네스가 없애려는 실패 유형이 정확히 그것이라, 도착했는지 확인하고 알린다.
+_missing_tools=""
+for _t in domain-extract domain-gate domain-freshness hook-io gate-runner render-agents pr-body commit-msg; do
+  [ -f "$TARGET_DIR/.claude/scripts/$_t.py" ] || _missing_tools="$_missing_tools $_t.py"
+done
+if [ -n "$_missing_tools" ]; then
+  warn "하네스 소유 도구 복사 실패:$_missing_tools"
+  warn "  해당 게이트는 동작하지 않습니다. 권한·디스크 상태를 확인하고 재실행하세요."
+else
+  success "하네스 소유 도구 설치 완료 (.claude/scripts/ — domain-extract/domain-gate/domain-freshness/hook-io/gate-runner/render-agents/pr-body/commit-msg)"
+fi
+
+# 게이트 선언은 사용자 소유다. 프로젝트마다 검사 목록이 다르고, 한번 손대면
+# 그게 그 팀의 것이 된다. 러너(위)는 덮어쓰고 선언(아래)은 보존한다.
+cp -n "$TEMPLATE_DIR/django/.claude/gates.json" \
+      "$TARGET_DIR/.claude/gates.json" 2>/dev/null || true
+
+# AGENTS.md — 플랫폼 중립 정본. 사용자가 절대 규칙을 채워 넣는 문서라 보존한다.
+# 이미 팀이 쓴 AGENTS.md 가 있으면 그대로 두고, 마커가 없으면 렌더러가 건너뛴다.
+cp -n "$TEMPLATE_DIR/django/AGENTS.md" "$TARGET_DIR/AGENTS.md" 2>/dev/null || true
+
+# 기존 설치는 CLAUDE.md(사용자 소유)에 작업 원칙이 남아 있고, 이제 AGENTS.md 에도
+# 같은 내용이 생긴다. 조용히 지우면 사용자가 고친 문장까지 날아가므로 알리기만 한다.
+if [ -f "$TARGET_DIR/CLAUDE.md" ] && grep -q '^### 1\. 코딩 전에 생각하라' "$TARGET_DIR/CLAUDE.md" 2>/dev/null; then
+  warn "CLAUDE.md 의 '코딩 원칙' 이 AGENTS.md 와 중복됩니다."
+  warn "  작업 원칙의 정본은 이제 AGENTS.md 입니다. CLAUDE.md 쪽 섹션을 지우세요."
+  warn "  (같은 규칙이 두 곳에 있으면 한쪽을 고칠 때 다른 쪽이 조용히 낡습니다.)"
+fi
 
 PROJECT_NAME=$(basename "$TARGET_DIR")
 
@@ -182,6 +227,69 @@ if [ ! -f "$TARGET_DIR/.claude/settings.json" ]; then
   success "settings.json 생성 완료"
 else
   warn ".claude/settings.json 이미 존재, 건너뜀"
+fi
+
+# ── 게이트 자가진단 주입 ─────────────────────────────────
+# settings.json 은 '없을 때만' 생성되므로, 기존 설치는 훅 파일이 갱신돼도
+# 자가진단이 등록되지 않는다. 여기서 멱등 병합한다 (CLAUDE.md 병합 규칙: python3만).
+# 함께 하는 일: 죽은 인라인 $TOOL_INPUT 훅을 파일 훅으로 교체 (마이그레이션).
+_inject_gate_selftest() {
+  python3 - "$TARGET_DIR/.claude/settings.json" << 'PYEOF'
+import json, sys
+
+path = sys.argv[1]
+try:
+    with open(path) as f:
+        settings = json.load(f)
+except (OSError, ValueError):
+    sys.exit(0)
+
+SELFTEST = ".claude/hooks/gate-selftest.sh"
+NOTICE = ".claude/hooks/post-bash-notice.sh"
+changed = False
+hooks = settings.setdefault("hooks", {})
+
+
+def each_hook():
+    for groups in hooks.values():
+        if not isinstance(groups, list):
+            continue
+        for group in groups:
+            if not isinstance(group, dict):
+                continue
+            for hook in group.get("hooks", []):
+                if isinstance(hook, dict):
+                    yield hook
+
+
+# 1) SessionStart 최상단에 자가진단 등록. 게이트가 죽었다면 다른 무엇보다 먼저 알아야 한다.
+if not any(h.get("command") == SELFTEST for h in each_hook()):
+    hooks.setdefault("SessionStart", []).insert(
+        0, {"hooks": [{"type": "command", "command": SELFTEST, "timeout": 15}]}
+    )
+    changed = True
+
+# 2) 존재하지 않는 $TOOL_INPUT 을 읽던 인라인 훅을 파일 훅으로 교체한다.
+#    'gh pr create' 를 함께 확인해 하네스가 심은 그 훅만 건드린다 —
+#    사용자가 직접 쓴 인라인 훅을 우리 것으로 덮어쓰지 않기 위해서다.
+for hook in each_hook():
+    command = str(hook.get("command", ""))
+    if "$TOOL_INPUT" in command and "gh pr create" in command:
+        hook["command"] = NOTICE
+        changed = True
+
+if changed:
+    with open(path, "w") as f:
+        json.dump(settings, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    print("changed")
+PYEOF
+}
+
+if [ -f "$TARGET_DIR/.claude/settings.json" ]; then
+  if [ -n "$(_inject_gate_selftest)" ]; then
+    success "게이트 자가진단 등록 완료 (SessionStart — 훅이 살아있는지 매 세션 실측)"
+  fi
 fi
 
 # ── LSP 설정 주입 ────────────────────────────────────────
@@ -392,6 +500,113 @@ if [ -n "$PRECOMMIT_YAML" ] && [ -f "$PRECOMMIT_YAML" ]; then
   if git -C "$TARGET_DIR" rev-parse --git-dir &>/dev/null; then
     if command -v pre-commit &>/dev/null; then
       (cd "$TARGET_DIR" && pre-commit install) && success "pre-commit 훅 등록 완료"
+
+      # 기존 설치는 .pre-commit-config.yaml 이 이미 있어 템플릿이 복사되지 않는다.
+      # 그러면 pre-push 통합 게이트가 영영 안 들어간다. 없을 때만 덧붙이고,
+      # 붙인 결과가 유효하지 않으면 되돌린다 (사용자 설정을 깨뜨리지 않는다).
+      PC_CONFIG="$TARGET_DIR/.pre-commit-config.yaml"
+      if [ -f "$PC_CONFIG" ] && ! grep -q 'gate-runner-pre-push' "$PC_CONFIG"; then
+        cp "$PC_CONFIG" "$PC_CONFIG.harness-bak"
+        # 이 스크립트는 set -e 로 돈다. 아래 python 이 exit 1 을 내면 그대로 설치가
+        # 중단되고, 정작 알리려던 경고도 못 나온 채 백업 파일만 남는다.
+        # `|| _pc_inserted=$?` 로 감싸 종료 상태를 직접 받는다.
+        _pc_inserted=0
+        # EOF 에 덧붙이지 않고 `repos:` 바로 뒤에 끼운다. 파일 끝이 항상 repos
+        # 리스트라는 보장이 없다 — `ci:` 같은 최상위 키가 뒤에 오면 덧붙인
+        # 블록이 그 키 밑으로 들어가 YAML 이 깨진다 (실측으로 확인).
+        # YAML 을 파싱해 재덤프하지 않는 이유는 주석이 전부 날아가기 때문이다.
+        python3 - "$PC_CONFIG" <<'PYEOF' || _pc_inserted=$?
+import sys
+
+path = sys.argv[1]
+lines = open(path, encoding="utf-8").read().splitlines(keepends=True)
+block = """  # harness-init 추가 — 커밋 메시지에 브랜치의 티켓 번호 삽입
+  - repo: local
+    hooks:
+      - id: commit-msg-ticket
+        name: 커밋 메시지에 티켓 번호 삽입
+        entry: python3 .claude/scripts/commit-msg.py
+        language: system
+        stages: [commit-msg]
+
+  # harness-init 추가 — AGENTS.md 자동 구간 갱신
+  # gates.json·settings.json 을 고치면 문서가 따라온다.
+  - repo: local
+    hooks:
+      - id: render-agents-md
+        name: AGENTS.md 자동 구간 갱신
+        entry: python3 .claude/scripts/render-agents.py --repo .
+        language: system
+        pass_filenames: false
+        files: '^\\.claude/(gates\\.json|settings\\.json)$|^AGENTS\\.md$'
+        stages: [pre-commit]
+
+  # harness-init 추가 — 통합 게이트 (push 직전)
+  # 로컬과 CI 가 같은 러너·같은 .claude/gates.json 을 쓴다.
+  - repo: local
+    hooks:
+      - id: gate-runner-pre-push
+        name: 통합 게이트 (pre-push)
+        entry: python3 .claude/scripts/gate-runner.py --stage pre-push
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+        verbose: true
+
+"""
+# `repos:` 를 못 찾으면 아무것도 쓰지 않고 끝난다. 그 상태로 두면 원본이
+# 그대로라 validate-config 가 통과하고, 호출부가 "추가했다"고 보고한다.
+# 이 PR 이 없애려는 바로 그 거짓 성공이라, 삽입 여부를 종료 코드로 알린다.
+for index, line in enumerate(lines):
+    if line.rstrip() == "repos:":
+        lines.insert(index + 1, block)
+        open(path, "w", encoding="utf-8").writelines(lines)
+        sys.exit(0)
+sys.exit(1)
+PYEOF
+        # 삽입 자체가 안 됐으면 파일은 원본 그대로다. 그 상태로 validate-config 를
+        # 돌리면 당연히 통과하고, 아무것도 안 했는데 "추가했다"고 보고하게 된다.
+        # 인자 없는 validate-config 는 아무것도 검사하지 않고 0 을 돌려주므로
+        # 파일명도 반드시 넘긴다 (이걸 빼서 깨진 YAML 을 통과시킨 적이 있다).
+        if [ "$_pc_inserted" -ne 0 ]; then
+          rm -f "$PC_CONFIG.harness-bak"
+          warn "pre-commit 설정에서 'repos:' 줄을 찾지 못해 게이트를 넣지 못했습니다."
+          warn "  (repos: [] 한 줄 형태이거나 뒤에 주석이 붙은 경우입니다.)"
+          warn "  .pre-commit-config.yaml 의 repos 목록에 아래를 직접 추가하세요:"
+          warn "    - repo: local"
+          warn "      hooks:"
+          warn "        - id: gate-runner-pre-push"
+          warn "          entry: python3 .claude/scripts/gate-runner.py --stage pre-push"
+          warn "          language: system"
+          warn "          pass_filenames: false"
+          warn "          always_run: true"
+          warn "          stages: [pre-push]"
+        elif (cd "$TARGET_DIR" && pre-commit validate-config .pre-commit-config.yaml >/dev/null 2>&1); then
+          rm -f "$PC_CONFIG.harness-bak"
+          success "pre-push 통합 게이트를 기존 .pre-commit-config.yaml 에 추가"
+        else
+          mv "$PC_CONFIG.harness-bak" "$PC_CONFIG"
+          warn "pre-push 게이트 자동 추가 실패 — 설정을 되돌렸습니다."
+          warn "  .pre-commit-config.yaml 에 아래를 직접 추가하세요:"
+          warn "    - repo: local"
+          warn "      hooks:"
+          warn "        - id: gate-runner-pre-push"
+          warn "          entry: python3 .claude/scripts/gate-runner.py --stage pre-push"
+          warn "          language: system"
+          warn "          pass_filenames: false"
+          warn "          always_run: true"
+          warn "          stages: [pre-push]"
+        fi
+      fi
+
+      # push 직전 통합 게이트. 별도 hook-type 이라 이 줄이 없으면 pre-push 는
+      # 설정에만 있고 실제로는 돌지 않는다 (조용히 없는 게이트가 된다).
+      (cd "$TARGET_DIR" && pre-commit install --hook-type pre-push) \
+        && success "pre-push 통합 게이트 등록 완료"
+      # commit-msg 도 별도 hook-type 이다. 빼먹으면 설정에만 있고 돌지 않는다.
+      (cd "$TARGET_DIR" && pre-commit install --hook-type commit-msg) \
+        && success "commit-msg 티켓 삽입 등록 완료"
     fi
   else
     warn "git 저장소가 아닙니다. 'git init' 후 'pre-commit install' 수동 실행 필요"
@@ -450,6 +665,16 @@ if IS_JS_ENV; then
   success "pyproject.toml 제거 완료"
 
   # pre-bash-guard.sh 오버라이드 (Django migrate 경고 제거)
+  # 게이트 선언도 스택별로 다르다. 사용자 소유라 이미 있으면 보존한다
+  # (django 기본이 먼저 깔렸어도 사용자가 손댔으면 그게 우선이다).
+  if [ -f "$TEMPLATE_DIR/js/.claude/gates.json" ]; then
+    if [ ! -f "$TARGET_DIR/.claude/gates.json" ] || \
+       grep -q '"lint (ruff)"' "$TARGET_DIR/.claude/gates.json" 2>/dev/null; then
+      cp -f "$TEMPLATE_DIR/js/.claude/gates.json" "$TARGET_DIR/.claude/gates.json"
+      success "gates.json JS 버전으로 교체"
+    fi
+  fi
+
   if [ -f "$TEMPLATE_DIR/js/.claude/hooks/pre-bash-guard.sh" ]; then
     cp -f "$TEMPLATE_DIR/js/.claude/hooks/pre-bash-guard.sh" "$TARGET_DIR/.claude/hooks/pre-bash-guard.sh"
     chmod +x "$TARGET_DIR/.claude/hooks/pre-bash-guard.sh"
@@ -469,6 +694,35 @@ if IS_JS_ENV; then
     cp -f "$TEMPLATE_DIR/js/docs/DOC-SYNC-POLICY.md" "$TARGET_DIR/docs/DOC-SYNC-POLICY.md"
     success "JS DOC-SYNC-POLICY.md 적용 완료"
   fi
+fi
+
+# ── CI 게이트 연결 확인 ────────────────────────────────
+# 워크플로는 사용자 소유라 cp -rn 이 기존 파일을 보존한다. 그래서 기존 설치는 로컬
+# pre-push 만 러너를 쓰고 CI 는 옛 명령을 돌리는 상태가 된다. 그러면 AGENTS.md 가
+# "CI 에서 이 게이트들이 돈다"고 적어놓고 실제로는 안 도는, 문서가 거짓말하는 상태가 된다.
+# (stadiumDjango 실측에서 실제로 이 상태가 나왔다.)
+# 어느 워크플로도 러너를 부르지 않으면 전용 파일을 하나 추가한다. 기존 워크플로는
+# 건드리지 않는다 — 팀이 손댄 CI 를 말없이 바꾸는 건 더 나쁘다.
+if [ -d "$TARGET_DIR/.github/workflows" ]; then
+  if ! grep -rql 'gate-runner' "$TARGET_DIR/.github/workflows" 2>/dev/null; then
+    _tpl="$TEMPLATE_DIR/django/.github/workflows/pr-test.yml"
+    [ "$ENV_TYPE" = "js" ] && [ -f "$TEMPLATE_DIR/js/.github/workflows/pr-test.yml" ] \
+      && _tpl="$TEMPLATE_DIR/js/.github/workflows/pr-test.yml"
+    if [ -f "$_tpl" ]; then
+      cp -f "$_tpl" "$TARGET_DIR/.github/workflows/harness-gates.yml"
+      success "CI 통합 게이트 워크플로 추가 (.github/workflows/harness-gates.yml)"
+      warn "  기존 워크플로는 그대로 뒀습니다. 테스트가 중복 실행되면"
+      warn "  기존 것을 지우거나 gate-runner 호출로 바꾸세요."
+    fi
+  fi
+fi
+
+# ── AGENTS.md 자동 구간 렌더 ───────────────────────────
+# gates.json 과 settings.json 이 모두 자리를 잡은 뒤에 돌려야 한다 (JS 오버라이드가
+# gates.json 을 바꾸므로 그 뒤). 정본에서 생성하므로 문서가 설정과 어긋날 수 없다.
+if [ -f "$TARGET_DIR/.claude/scripts/render-agents.py" ]; then
+  python3 "$TARGET_DIR/.claude/scripts/render-agents.py" --repo "$TARGET_DIR" >/dev/null 2>&1 \
+    && success "AGENTS.md 자동 구간 렌더 완료 (파이프라인·금지 명령)"
 fi
 
 # ── 구조 지식 계층 (codegraph) ─────────────────────────
@@ -583,6 +837,33 @@ echo "  · 이슈 자동 처리 불가 (claude)"
 echo ""
 echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
+
+# ── 설치 직후 게이트 실측 ──────────────────────────────
+# 어떤 게이트가 이 레포에서 통과하는지는 **추측하면 안 된다**. 이미 개발이 진행된
+# 레포에서는 repo-wide 검사가 첫날부터 빨간불일 수 있고, 그러면 첫 push 가 막힌 채
+# 원인을 모른다. 실제로 stadiumDjango 에서 포맷 검사가 44/176 파일로 걸렸다.
+#
+# 여기서 한 번 돌려 현실을 보여준다. 자동으로 게이트를 끄지는 않는다 — 무엇을 포기할지는
+# 사람이 정한다. 덤으로 pre-push 가 앞으로 얼마나 걸릴지도 이때 드러난다.
+if [ -f "$TARGET_DIR/.claude/scripts/gate-runner.py" ] && [ -f "$TARGET_DIR/.claude/gates.json" ]; then
+  echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo -e "${BLUE}  게이트 실측 — 지금 이 레포에서 무엇이 통과하는가${NC}"
+  echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo ""
+  if (cd "$TARGET_DIR" && python3 .claude/scripts/gate-runner.py --stage pre-push --no-fail-fast); then
+    echo ""
+    success "현재 상태에서 pre-push 게이트가 통과합니다."
+  else
+    echo ""
+    warn "위 게이트가 지금 실패합니다 — 이 상태로는 첫 push 가 막힙니다."
+    warn "  둘 중 하나를 하세요:"
+    warn "   1) 코드를 고쳐 통과시킨다"
+    warn "   2) .claude/gates.json 에서 해당 게이트를 빼거나 조건을 좁힌다"
+    warn "  게이트를 빼는 것은 후퇴가 아닙니다. 첫날부터 빨간불이면 팀이 하네스를"
+    warn "  통째로 끄고, 그러면 나머지 게이트까지 같이 사라집니다."
+  fi
+  echo ""
+fi
 
 if [ "$USE_ATLASSIAN_MCP" = "yes" ]; then
   echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"

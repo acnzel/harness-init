@@ -1,0 +1,51 @@
+{
+  "_note": [
+    "게이트 선언 정본. 같은 러너를 pre-push 와 CI 가 호출하므로 여기 한 곳만 고치면 둘 다 따라온다.",
+    "실행: python3 .claude/scripts/gate-runner.py --stage pre-push  (--list 로 목록만)",
+    "",
+    "역할 분담:",
+    "  pre-commit  파일 단위·빠른 검사·자동수정 → .pre-commit-config.yaml 이 담당 (ruff, domain-gate)",
+    "  pre-push/ci 레포 단위 통합 검사        → 이 파일이 담당",
+    "",
+    "필드: name, cmd, stages(pre-commit|pre-push|ci) 필수 / requires, requires_file, allow_failure, note 선택.",
+    "requires·requires_file 이 없으면 SKIP 이다. SKIP 은 통과가 아니며 요약에 따로 표시된다.",
+    "JSON 인 이유: PyYAML 은 표준 라이브러리가 아니라, 인터프리터 업그레이드 한 번에 게이트가 통째로 죽는다.",
+    "",
+    "repo-wide 포맷 검사는 기본에서 뺐다. lint-baseline.py 는 ruff check 위반만 유예하고",
+    "ruff format 은 유예 장치가 없어, 이미 개발된 레포에 깔면 첫 push 부터 막힌다",
+    "(실측: 44/176 파일 미포맷). 포맷은 pre-commit 의 ruff-format 이 변경 파일만 고쳐",
+    "점진 수렴시킨다. 레포가 다 수렴하면 아래를 추가해 켤 것:",
+    "  {\"name\": \"format check (ruff)\", \"cmd\": \"ruff format --check .\", \"stages\": [\"pre-push\",\"ci\"], \"requires\": \"ruff\"}"
+  ],
+  "gates": [
+    {
+      "name": "lint (ruff)",
+      "cmd": "ruff check .",
+      "stages": [
+        "pre-push",
+        "ci"
+      ],
+      "requires": "ruff",
+      "note": "pre-commit 은 변경 파일만 본다. 여기서 레포 전체를 확인한다."
+    },
+    {
+      "name": "tests (pytest)",
+      "cmd": "pytest -q",
+      "stages": [
+        "pre-push",
+        "ci"
+      ],
+      "requires": "pytest",
+      "requires_file": "tests",
+      "note": "tests 디렉터리가 없으면 SKIP. 경로가 다르면 requires_file 을 고칠 것."
+    },
+    {
+      "name": "AGENTS.md 자동 구간 최신",
+      "cmd": "python3 .claude/scripts/render-agents.py --repo . --check",
+      "stages": [
+        "ci"
+      ],
+      "note": "pre-commit 훅을 우회했거나 설치하지 않은 기여자를 CI 에서 잡는다."
+    }
+  ]
+}

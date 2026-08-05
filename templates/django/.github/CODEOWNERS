@@ -1,0 +1,32 @@
+# CODEOWNERS — 리뷰어 자동 할당
+#
+# 아래는 전부 주석 처리되어 있습니다. `@your-org/backend` 를 실제 팀·계정으로 바꾸고
+# 필요한 줄의 `#` 을 지우세요. 존재하지 않는 핸들을 넣으면 GitHub 이 CODEOWNERS 오류를
+# 표시하므로, 채우기 전에는 켜지 않습니다.
+#
+# ── 왜 하네스 파일이 첫 줄에 있나 ───────────────────────────────────────────
+# 게이트는 조용히 약해집니다. 검사 하나를 gates.json 에서 빼거나 deny 목록을 줄이는
+# 변경은 diff 두 줄이라 눈에 잘 안 띕니다. 하네스 자체를 리뷰 대상에 넣어야 그 변경이
+# 사람 눈을 거칩니다. 규칙을 지키게 만드는 것보다 규칙을 몰래 낮추지 못하게 하는 게
+# 먼저입니다.
+
+# ── 하네스 (게이트·규칙·권한) ──────────────────────────────────────────────
+# AGENTS.md                @your-org/backend
+# CLAUDE.md                @your-org/backend
+# .claude/                 @your-org/backend
+# .github/workflows/       @your-org/backend
+# .pre-commit-config.yaml  @your-org/backend
+# .github/CODEOWNERS       @your-org/backend
+
+# ── 민감 영역 ──────────────────────────────────────────────────────────────
+# 되돌리기 어렵거나 사고 반경이 큰 경로를 적습니다. 파일 수가 아니라 blast radius 로
+# 고르세요. 5줄짜리 결제 변경이 500줄짜리 로그 포맷 변경보다 위험합니다.
+#
+# 예시 (프로젝트에 맞게 고칠 것):
+# **/migrations/          @your-org/backend
+# **/auth/                @your-org/backend
+# **/payment*/            @your-org/backend
+# **/settings/            @your-org/backend
+
+# ── 기본 소유자 ────────────────────────────────────────────────────────────
+# *                        @your-org/backend

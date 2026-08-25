@@ -1,15 +1,21 @@
 name: Post-Merge Docs Update
 
+# 브랜치를 고정하지 않는다. 이전 버전은 `branches: [dev, prod]` 였는데, 주입 대상
+# 레포는 대개 main/develop 을 쓰므로 워크플로가 아예 돌지 않았다.
+#
+# 그렇다고 모든 머지에 반응하면 스택 PR 의 중간 머지마다 이슈가 생긴다. 그래서
+# 필터는 `on:` 이 아니라 아래 job 조건에 두고, 기준 브랜치를 하드코딩하는 대신
+# 레포의 기본 브랜치(`repository.default_branch`)를 런타임에 읽는다.
+
 on:
   pull_request:
     types: [closed]
-    branches:
-      - dev
-      - prod
 
 jobs:
   update-docs:
-    if: github.event.pull_request.merged == true
+    if: >-
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.base.ref == github.event.repository.default_branch
     runs-on: ubuntu-latest
     permissions:
       contents: write

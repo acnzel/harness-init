@@ -16,17 +16,23 @@ AI 에이전트(Claude Code)가 신뢰할 수 있는 결과물을 생산하도�
 harness-init/
 ├── init.sh                 ← 메인 실행 진입점. 스택 감지 → 분기 → 설치 순서
 ├── templates/
-│   ├── django/             ← Django/Python 전용 하네스
-│   └── js/                 ← JS/TS 전용 하네스 (django/ 위에 오버라이드)
+│   ├── base-project/       ← 스택 미감지 시의 최소 하네스 (django/js 와 섞이지 않는다)
+│   ├── django/             ← Django/Python 전용 하네스 + 모든 스택의 베이스
+│   └── js/                 ← JS/TS 오버라이드 (django/ 위에 덮어쓰기)
 └── scripts/
     ├── domain-init.sh      ← DOMAIN.md 스켈레톤 생성
     ├── domain-fill.sh      ← Claude Code로 DOMAIN.md 채우기
+    ├── domain-extract.py   ← Choices·db_table·시그널 AST 추출 (stdlib ast, LLM 미사용)
+    ├── domain-gate.py      ← 의미 변화 감지 게이트 (pre-commit·PostToolUse, 하네스 소유)
+    ├── domain-freshness.py ← DOMAIN.md 신선도 리포트 (SessionStart 주입, 하네스 소유)
     ├── hook-io.py          ← 훅 페이로드 파싱 + 발화 기록 (전 훅 공용, 하네스 소유)
     ├── gate-runner.py      ← 선언된 게이트를 시점별 실행 (pre-push·CI 공용, 하네스 소유)
     ├── render-agents.py    ← AGENTS.md 자동 구간 렌더 (하네스 소유)
     ├── pr-body.py          ← PR 본문 자동 수집 구간 (하네스 소유)
     ├── commit-msg.py       ← 커밋 메시지 티켓 삽입 (하네스 소유)
-    ├── migration.sh        ← 비 Django 스택 마이그레이션
+    ├── lint-baseline.py    ← 기존 레포에 ruff 를 처음 켤 때의 규칙 단위 유예 생성
+    ├── codegraph-setup.sh  ← 구조 지식 계층 배선 (선택 의존성, 없으면 안내만)
+    ├── migration.sh        ← 스택 감지 + 비 Django 스택 마이그레이션
     └── merge-claude-md.sh  ← CLAUDE.md 주입 헬퍼
 ```
 
@@ -34,14 +40,57 @@ harness-init/
 
 ## init.sh 구조 (단계 순서)
 
-1. **환경 선택** — Python / JS·TS / 자동 감지
-2. **스택 감지** — `manage.py`, `package.json` 등으로 기술 스택 판별
-3. **하네스 설치** — `templates/django/` 또는 `templates/js/` 복사
-4. **pre-commit 설치** — Python: ruff, JS·TS: prettier + eslint
-5. **스택 마이그레이션** — `migration.sh`로 비 Django 스택 적응
-6. **DOMAIN.md 생성** — `domain-init.sh` + `domain-fill.sh`
+각 단계는 `# ── 제목 ──` 마커로 구분된다. 아래 목록의 굵은 글씨가 그 마커 문구다.
+줄 번호는 적지 않는다 — 한 줄만 넣어도 전부 밀려서 다음 사람이 못 믿는다.
+위치를 찾을 때는 `grep -n '^# ── ' init.sh`.
 
-> 단계를 추가할 때는 반드시 기존 단계 번호 순서를 유지하고, 완료 메시지를 출력하라.
+### 공통 (항상 실행)
+
+1. **환경 선택** — Python / JS·TS / 자동 감지. 비대화형이면 `auto`
+2. **Atlassian MCP 연동 여부** — Jira·Confluence MCP 서버를 settings.json 에 넣을지
+3. **스택 감지** — `migration.sh --detect` 가 `manage.py`·`package.json` 등으로 판별
+
+### 분기 A — 스택 미감지 (`ENV_TYPE=auto` + `STACK=unknown`)
+
+4. **스택 미감지 — 최소 하네스(base-project)만 설치** — CLAUDE.md·settings.json·훅
+   2개·.gitignore 만 깔고 `SKIP_FULL_INSTALL=true` 로 아래 전체를 건너뛴다
+
+### 분기 B — 전체 설치 (`SKIP_FULL_INSTALL` 가드 안)
+
+5. **CLAUDE.md 생성/업데이트** — `merge-claude-md.sh`
+6. **.claude 디렉토리 구조 생성** — skills·agents·commands·hooks·rules·scripts·
+   gates.json·AGENTS.md·settings.json. 소유권에 따라 `-n` 과 `-f` 가 갈린다 (아래 멱등성 절)
+7. **게이트 자가진단 주입** — settings.json 멱등 병합. 기존 설치의 죽은 인라인 훅도 교체
+8. **LSP 설정 주입** — 언어별 LSP. 이어서 Atlassian MCP 설정과
+   `.gemini`·`.github`·`docs`·`DOMAIN.md` 복사가 같은 구간에 있다
+9. **.gitignore 업데이트** — 스택별 `.gitignore.append` 를 추가 (이미 있으면 건너뜀)
+10. **pre-commit 설정** — Python: ruff / JS·TS: prettier + eslint. lint baseline 포함
+11. **비 Django 스택이면 harness 마이그레이션** — `migration.sh` 가 템플릿 문구를 스택에 맞게 치환
+12. **JS 환경 전용 파일 오버라이드** — agents·rules·워크플로·CLAUDE.md·gates.json 등을 JS 판으로
+13. **CI 게이트 연결 확인** — 어느 워크플로도 `gate-runner` 를 안 부르면 전용 파일을 하나 추가
+14. **AGENTS.md 자동 구간 렌더** — `render-agents.py`
+15. **구조 지식 계층 (codegraph)** — 선택 의존성. 없으면 안내만
+16. **의미 지식 계층 (DOMAIN.md)** — `domain-init.sh` + `domain-fill.sh`
+17. **완료 메시지**
+18. **설치 직후 게이트 실측** — `gate-runner --stage pre-push` 를 한 번 돌려 현실을 보여준다
+
+### 순서가 고정된 지점
+
+번호는 참조용이고, 진짜 제약은 아래 네 개다. 새 단계는 이 제약을 깨지 않는 자리에 넣는다.
+
+| 단계 | 반드시 이 뒤에 | 어기면 |
+|---|---|---|
+| 게이트 자가진단 주입(7) | settings.json 생성(6) | 읽을 파일이 없어 `sys.exit(0)` 으로 조용히 건너뛴다 |
+| CI 게이트 연결 확인(13) | `.github` 워크플로 복사(8) | `workflows/` 가 없어 조건문 전체를 지나친다 |
+| AGENTS.md 렌더(14) | gates.json 확정(12) | 문서가 JS 교체 전 게이트 목록을 박제한다 |
+| 게이트 실측(18) | gates.json 확정(12) | 교체 전 목록으로 돌려 실제와 다른 결과를 보여준다 |
+
+넷 다 **조용한 실패**다. 순서를 어겨도 `init.sh` 는 exit 0 으로 끝나고 완료
+메시지까지 출력한다. 새 단계를 넣을 때 위치를 눈으로만 고르지 말 것.
+
+> 단계를 추가하면 이 목록에 함께 적고, 완료 메시지를 출력한다.
+> 목록과 `grep -n '^# ── ' init.sh` 결과가 어긋나면 목록이 틀린 것이다 — 이 절은 실제로
+> 6단계로 낡아 있었고, 그동안 "번호 순서를 유지하라"는 지시가 가리킬 대상이 없었다.
 
 ---
 
@@ -49,8 +98,23 @@ harness-init/
 
 | 계층 | 경로 | 적용 방식 |
 |------|------|----------|
+| 최소 하네스 | `templates/base-project/` | 스택 미감지 시에만. CLAUDE.md·settings.json·훅 2개·.gitignore 로 끝내고 전체 설치를 건너뛴다 |
 | Python 공통 | `templates/django/` | 프로젝트 루트에 복사 |
 | JS 오버라이드 | `templates/js/` | `templates/django/` 위에 덮어쓰기 |
+
+`base-project/` 는 오버라이드 계층이 아니라 **분기**다. 스택을 못 찾았을 때 `init.sh` 가
+여기까지만 깔고 `SKIP_FULL_INSTALL` 로 빠져나간다. 감지되는 스택에는 쓰이지 않는다.
+
+`js/` 는 오버라이드라 **`js/` 에 없는 파일은 `django/` 것이 그대로 간다**. 그래서
+`AGENTS.md` 와 `.claude/settings.json` 은 `templates/js/` 에 두지 않는다. settings.json 의
+JS 차이는 `migration.sh` 의 `migrate_settings()` 가 Django 전용 deny 항목을 걷어내고
+`init.sh` 가 LSP 설정을 주입하는 것으로 처리한다. JS 에서만 다른 파일이 아니면 `js/` 에
+복사본을 만들지 말 것.
+
+**단, `js/` 에 파일을 두는 것만으로는 설치되지 않는다.** `.claude/agents`·`rules` 는
+디렉터리 통째로 복사되지만 `.github/workflows/` 는 파일마다 `init.sh` 의 JS 오버라이드
+구간에 `cp -f` 한 줄을 명시해야 한다. 빠뜨리면 그 템플릿은 죽은 파일이 되고 대상 레포에는
+django 판이 깔린 채 조용히 오작동한다 (`post-merge-docs.yml` 이 실제로 그 상태였다).
 
 새 스택을 추가할 때는 `templates/{stack}/`을 만들고 `migration.sh`의 `configure_stack()` 함수에 분기를 추가한다.
 

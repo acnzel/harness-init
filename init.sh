@@ -654,6 +654,15 @@ if IS_JS_ENV; then
     success "JS pr-test.yml 적용 완료"
   fi
 
+  # post-merge-docs.yml 오버라이드 (views.py 감지 → 라우트/컨트롤러 감지)
+  # 이 복사가 없던 동안 JS 프로젝트에는 django 판이 깔려 views.py 를 찾고 있었다.
+  # JS 레포에 그 파일이 있을 리 없으니 문서 갱신 이슈가 한 번도 생기지 않았다.
+  # templates/js/ 에 파일만 두고 여기 배선을 빠뜨리면 그 템플릿은 죽은 파일이 된다.
+  if [ -f "$TEMPLATE_DIR/js/.github/workflows/post-merge-docs.yml" ]; then
+    cp -f "$TEMPLATE_DIR/js/.github/workflows/post-merge-docs.yml" "$TARGET_DIR/.github/workflows/post-merge-docs.yml"
+    success "JS post-merge-docs.yml 적용 완료"
+  fi
+
   # CLAUDE.md 오버라이드 (Django 아키텍처 규칙 → JS/TS 아키텍처 규칙)
   if [ -f "$TEMPLATE_DIR/js/CLAUDE.md" ]; then
     cp -f "$TEMPLATE_DIR/js/CLAUDE.md" "$TARGET_DIR/CLAUDE.md"

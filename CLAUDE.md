@@ -40,14 +40,57 @@ harness-init/
 
 ## init.sh 구조 (단계 순서)
 
-1. **환경 선택** — Python / JS·TS / 자동 감지
-2. **스택 감지** — `manage.py`, `package.json` 등으로 기술 스택 판별
-3. **하네스 설치** — `templates/django/` 또는 `templates/js/` 복사
-4. **pre-commit 설치** — Python: ruff, JS·TS: prettier + eslint
-5. **스택 마이그레이션** — `migration.sh`로 비 Django 스택 적응
-6. **DOMAIN.md 생성** — `domain-init.sh` + `domain-fill.sh`
+각 단계는 `# ── 제목 ──` 마커로 구분된다. 아래 목록의 굵은 글씨가 그 마커 문구다.
+줄 번호는 적지 않는다 — 한 줄만 넣어도 전부 밀려서 다음 사람이 못 믿는다.
+위치를 찾을 때는 `grep -n '^# ── ' init.sh`.
 
-> 단계를 추가할 때는 반드시 기존 단계 번호 순서를 유지하고, 완료 메시지를 출력하라.
+### 공통 (항상 실행)
+
+1. **환경 선택** — Python / JS·TS / 자동 감지. 비대화형이면 `auto`
+2. **Atlassian MCP 연동 여부** — Jira·Confluence MCP 서버를 settings.json 에 넣을지
+3. **스택 감지** — `migration.sh --detect` 가 `manage.py`·`package.json` 등으로 판별
+
+### 분기 A — 스택 미감지 (`ENV_TYPE=auto` + `STACK=unknown`)
+
+4. **스택 미감지 — 최소 하네스(base-project)만 설치** — CLAUDE.md·settings.json·훅
+   2개·.gitignore 만 깔고 `SKIP_FULL_INSTALL=true` 로 아래 전체를 건너뛴다
+
+### 분기 B — 전체 설치 (`SKIP_FULL_INSTALL` 가드 안)
+
+5. **CLAUDE.md 생성/업데이트** — `merge-claude-md.sh`
+6. **.claude 디렉토리 구조 생성** — skills·agents·commands·hooks·rules·scripts·
+   gates.json·AGENTS.md·settings.json. 소유권에 따라 `-n` 과 `-f` 가 갈린다 (아래 멱등성 절)
+7. **게이트 자가진단 주입** — settings.json 멱등 병합. 기존 설치의 죽은 인라인 훅도 교체
+8. **LSP 설정 주입** — 언어별 LSP. 이어서 Atlassian MCP 설정과
+   `.gemini`·`.github`·`docs`·`DOMAIN.md` 복사가 같은 구간에 있다
+9. **.gitignore 업데이트** — 스택별 `.gitignore.append` 를 추가 (이미 있으면 건너뜀)
+10. **pre-commit 설정** — Python: ruff / JS·TS: prettier + eslint. lint baseline 포함
+11. **비 Django 스택이면 harness 마이그레이션** — `migration.sh` 가 템플릿 문구를 스택에 맞게 치환
+12. **JS 환경 전용 파일 오버라이드** — agents·rules·워크플로·CLAUDE.md·gates.json 등을 JS 판으로
+13. **CI 게이트 연결 확인** — 어느 워크플로도 `gate-runner` 를 안 부르면 전용 파일을 하나 추가
+14. **AGENTS.md 자동 구간 렌더** — `render-agents.py`
+15. **구조 지식 계층 (codegraph)** — 선택 의존성. 없으면 안내만
+16. **의미 지식 계층 (DOMAIN.md)** — `domain-init.sh` + `domain-fill.sh`
+17. **완료 메시지**
+18. **설치 직후 게이트 실측** — `gate-runner --stage pre-push` 를 한 번 돌려 현실을 보여준다
+
+### 순서가 고정된 지점
+
+번호는 참조용이고, 진짜 제약은 아래 네 개다. 새 단계는 이 제약을 깨지 않는 자리에 넣는다.
+
+| 단계 | 반드시 이 뒤에 | 어기면 |
+|---|---|---|
+| 게이트 자가진단 주입(7) | settings.json 생성(6) | 읽을 파일이 없어 `sys.exit(0)` 으로 조용히 건너뛴다 |
+| CI 게이트 연결 확인(13) | `.github` 워크플로 복사(8) | `workflows/` 가 없어 조건문 전체를 지나친다 |
+| AGENTS.md 렌더(14) | gates.json 확정(12) | 문서가 JS 교체 전 게이트 목록을 박제한다 |
+| 게이트 실측(18) | gates.json 확정(12) | 교체 전 목록으로 돌려 실제와 다른 결과를 보여준다 |
+
+넷 다 **조용한 실패**다. 순서를 어겨도 `init.sh` 는 exit 0 으로 끝나고 완료
+메시지까지 출력한다. 새 단계를 넣을 때 위치를 눈으로만 고르지 말 것.
+
+> 단계를 추가하면 이 목록에 함께 적고, 완료 메시지를 출력한다.
+> 목록과 `grep -n '^# ── ' init.sh` 결과가 어긋나면 목록이 틀린 것이다 — 이 절은 실제로
+> 6단계로 낡아 있었고, 그동안 "번호 순서를 유지하라"는 지시가 가리킬 대상이 없었다.
 
 ---
 

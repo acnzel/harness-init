@@ -173,6 +173,32 @@ else
 	esac
 fi
 
+# ── 6. 로컬 훅 부트스트랩 ──────────────────────────────
+# `.pre-commit-config.yaml` 은 커밋되지만 `.git/hooks/` 는 전파되지 않는다.
+# 그래서 새로 clone 한 사람은 설정을 다 받고도 **로컬 게이트 없이 커밋한다**.
+# 본인은 하네스가 지켜주는 줄 알고, 실제로는 CI 까지 아무것도 안 걸린다.
+#
+# 새 클론에 훅을 강제할 방법은 없다 (pre-commit·husky 전부 설치 단계를 요구한다).
+# 그래서 여기서는 강제 대신 **크게 알리고** 정확한 복구 명령을 준다. 놓친 것은
+# CI 의 gate-runner 가 PR 에서 받는다 — 늦게 걸릴 뿐 안 걸리지는 않는다.
+if [ ! -f "$PROJECT_DIR/.pre-commit-config.yaml" ]; then
+	skip "pre-commit 설정 없음 — 로컬 게이트 대상 아님"
+elif [ ! -d "$PROJECT_DIR/.git" ]; then
+	skip "git 저장소 아님 — 로컬 훅 부트스트랩 확인 생략"
+else
+	MISSING_HOOKS=""
+	for _h in pre-commit pre-push commit-msg; do
+		if ! grep -q 'pre-commit' "$PROJECT_DIR/.git/hooks/$_h" 2>/dev/null; then
+			MISSING_HOOKS="$MISSING_HOOKS $_h"
+		fi
+	done
+	if [ -n "$MISSING_HOOKS" ]; then
+		fail "로컬 훅 미설치:$MISSING_HOOKS — 이 클론에서는 커밋·푸시가 검사 없이 통과합니다 (복구: pre-commit install --install-hooks && pre-commit install -t pre-push -t commit-msg)"
+	else
+		pass "로컬 훅 부트스트랩 — pre-commit/pre-push/commit-msg 등록됨"
+	fi
+fi
+
 # ── 결과 ───────────────────────────────────────────────
 if [ -n "$FAILURES" ]; then
 	echo ""

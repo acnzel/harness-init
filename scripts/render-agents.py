@@ -44,6 +44,8 @@ import json
 import os
 import sys
 
+from atomic_write import atomic_write_text
+
 MARKER_START = "<!-- harness:auto:start -->"
 MARKER_END = "<!-- harness:auto:end -->"
 
@@ -245,7 +247,7 @@ def main(argv=None):
         return 1
 
     try:
-        open(path, "w", encoding="utf-8").write(updated)
+        atomic_write_text(path, updated)
     except OSError as exc:
         print(f"[render-agents] {path} 를 쓸 수 없습니다: {exc}", file=sys.stderr)
         return 2

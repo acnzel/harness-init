@@ -788,7 +788,10 @@ JS 전용으로 교체됩니다. (`pre-bash-guard.sh` 만 Django migrate 경고�
 harness-init/
 ├── README.md
 ├── CLAUDE.md                     ← harness-init 자체 개발 가이드
+├── CHANGELOG.md                  ← 대상 레포에 도착하는 것 기준의 변경 이력
+├── VERSION                       ← 설치 시 .claude/harness-version 에 기록
 ├── init.sh                       ← 메인 실행 스크립트
+├── tests/                        ← 회귀 스위트 (임시 레포에 실제로 init.sh 를 돌린다)
 ├── templates/
 │   ├── base-project/             ← 스택 미감지 시의 최소 하네스 (CLAUDE.md·settings.json·훅 2개)
 │   ├── django/                   ← Django/Python 전용 템플릿
@@ -813,6 +816,7 @@ harness-init/
 │           ├── pr-test.yml               ← Node.js 20 + npm ci + npm test
 │           └── post-merge-docs.yml       ← 머지 후 API 문서 갱신 이슈 자동 생성
 └── scripts/
+    ├── atomic_write.py           ← 원자적 파일 교체 (render-agents·commit-msg·lint-baseline 공용)
     ├── domain-extract.py         ← AST로 Choices·시그널·db_table 추출 (LLM 미사용)
     ├── domain-gate.py            ← 의미 변화 판정, 훅·pre-commit·CI 공용
     ├── domain-freshness.py       ← DOMAIN.md가 소스보다 며칠 뒤처졌는지 측정

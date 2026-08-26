@@ -15,11 +15,16 @@ AI 에이전트(Claude Code)가 신뢰할 수 있는 결과물을 생산하도�
 ```
 harness-init/
 ├── init.sh                 ← 메인 실행 진입점. 스택 감지 → 분기 → 설치 순서
+├── VERSION                 ← 대상 레포의 .claude/harness-version 에 기록되는 값
+├── CHANGELOG.md            ← 대상 레포에 도착하는 것 기준으로 버전을 매긴다
+├── tests/                  ← 회귀 스위트. 임시 레포에 실제로 init.sh 를 돌린다
+├── .github/workflows/      ← 자체 CI (test.yml)
 ├── templates/
 │   ├── base-project/       ← 스택 미감지 시의 최소 하네스 (django/js 와 섞이지 않는다)
 │   ├── django/             ← Django/Python 전용 하네스 + 모든 스택의 베이스
 │   └── js/                 ← JS/TS 오버라이드 (django/ 위에 덮어쓰기)
 └── scripts/
+    ├── atomic_write.py     ← 원자적 파일 교체 (사람이 쓴 파일을 덮어쓰는 셋이 공용, 하네스 소유)
     ├── domain-init.sh      ← DOMAIN.md 스켈레톤 생성
     ├── domain-fill.sh      ← Claude Code로 DOMAIN.md 채우기
     ├── domain-extract.py   ← Choices·db_table·시그널 AST 추출 (stdlib ast, LLM 미사용)
@@ -68,11 +73,13 @@ harness-init/
 11. **비 Django 스택이면 harness 마이그레이션** — `migration.sh` 가 템플릿 문구를 스택에 맞게 치환
 12. **JS 환경 전용 파일 오버라이드** — agents·rules·워크플로·CLAUDE.md·gates.json 등을 JS 판으로
 13. **CI 게이트 연결 확인** — 어느 워크플로도 `gate-runner` 를 안 부르면 전용 파일을 하나 추가
-14. **AGENTS.md 자동 구간 렌더** — `render-agents.py`
-15. **구조 지식 계층 (codegraph)** — 선택 의존성. 없으면 안내만
-16. **의미 지식 계층 (DOMAIN.md)** — `domain-init.sh` + `domain-fill.sh`
-17. **완료 메시지**
-18. **설치 직후 게이트 실측** — `gate-runner --stage pre-push` 를 한 번 돌려 현실을 보여준다
+14. **버전 기록** — `VERSION` 을 `.claude/harness-version` 에 남긴다. 대상 레포에서
+    어느 판이 깔렸는지 확인할 수 있어야 갱신 여부를 판정할 수 있다
+15. **AGENTS.md 자동 구간 렌더** — `render-agents.py`
+16. **구조 지식 계층 (codegraph)** — 선택 의존성. 없으면 안내만
+17. **의미 지식 계층 (DOMAIN.md)** — `domain-init.sh` + `domain-fill.sh`
+18. **완료 메시지**
+19. **설치 직후 게이트 실측** — `gate-runner --stage pre-push` 를 한 번 돌려 현실을 보여준다
 
 ### 순서가 고정된 지점
 
@@ -82,8 +89,8 @@ harness-init/
 |---|---|---|
 | 게이트 자가진단 주입(7) | settings.json 생성(6) | 읽을 파일이 없어 `sys.exit(0)` 으로 조용히 건너뛴다 |
 | CI 게이트 연결 확인(13) | `.github` 워크플로 복사(8) | `workflows/` 가 없어 조건문 전체를 지나친다 |
-| AGENTS.md 렌더(14) | gates.json 확정(12) | 문서가 JS 교체 전 게이트 목록을 박제한다 |
-| 게이트 실측(18) | gates.json 확정(12) | 교체 전 목록으로 돌려 실제와 다른 결과를 보여준다 |
+| AGENTS.md 렌더(15) | gates.json 확정(12) | 문서가 JS 교체 전 게이트 목록을 박제한다 |
+| 게이트 실측(19) | gates.json 확정(12) | 교체 전 목록으로 돌려 실제와 다른 결과를 보여준다 |
 
 넷 다 **조용한 실패**다. 순서를 어겨도 `init.sh` 는 exit 0 으로 끝나고 완료
 메시지까지 출력한다. 새 단계를 넣을 때 위치를 눈으로만 고르지 말 것.
@@ -236,6 +243,30 @@ django 판이 깔린 채 조용히 오작동한다 (`post-merge-docs.yml` 이 �
 
 ---
 
+## 테스트
+
+```bash
+python3 -m unittest discover -s tests -t tests -p 'test_*.py'
+```
+
+의존성 없이 stdlib 만 쓴다. 스위트는 임시 디렉터리에 **실제로 `init.sh` 를 돌리고**
+디스크에 남은 결과만 본다. 설치를 흉내 내면 이 하네스가 없애려는 실패("설치했다고
+보고했지만 안 깔린")를 그대로 통과시키기 때문이다.
+
+| 파일 | 고정하는 것 |
+|---|---|
+| `test_install.py` | 스택별로 무엇이 실제로 도착하는가, 워크플로 계약, 자체 CI |
+| `test_idempotency.py` | 재실행 시 사용자 소유 보존 / 하네스 소유 갱신 |
+| `test_docs_consistency.py` | 문서의 트리·단계 목록이 실물과 같은가 |
+| `test_atomic_write.py` | 쓰기 중단 시 사람이 쓴 파일이 살아남는가 |
+| `test_bootstrap.py` | 새 클론에서 로컬 게이트 부재가 발화하는가 |
+
+**새 검사를 추가할 때는 뮤테이션으로 확인한다.** 가드를 되돌렸을 때 실제로 빨간불이
+뜨는지 보지 않으면, 아무것도 검증하지 않는 테스트가 초록불로 남는다. 실제로 단계
+번호를 망가뜨렸는데 목록 검사가 통과한 적이 있다 (제목만 비교하고 있었다).
+
+---
+
 ## 새 기능 추가 체크리스트
 
 - [ ] `init.sh`에 단계 추가 (번호 순서 유지)
@@ -246,3 +277,6 @@ django 판이 깔린 채 조용히 오작동한다 (`post-merge-docs.yml` 이 �
 - [ ] 멱등성 확인 (재실행해도 안전한지)
 - [ ] 게이트·훅을 추가했으면 `gate-selftest.sh` 에 positive/negative 쌍 추가
 - [ ] 기존 설치에도 전파되는지 확인 (하네스 소유면 `cp -f`, settings.json 이면 멱등 병합)
+- [ ] `tests/` 에 회귀 테스트 추가, **뮤테이션으로 발화 확인**
+- [ ] 단계를 추가했으면 `CLAUDE.md` 단계 목록과 번호를 함께 갱신 (테스트가 잡는다)
+- [ ] `CHANGELOG.md` 에 항목 추가, 필요하면 `VERSION` 증가

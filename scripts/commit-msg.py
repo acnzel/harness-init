@@ -27,6 +27,8 @@ import re
 import subprocess
 import sys
 
+from atomic_write import atomic_write_text
+
 # feature/ABC-123-설명, ABC-123, bugfix_ABC-123 등에서 잡는다.
 TICKET_RE = re.compile(r"\b([A-Z][A-Z0-9]{1,9}-\d+)\b", re.IGNORECASE)
 # 이미 제목에 티켓이 있는가 (대괄호 유무 무관)
@@ -109,7 +111,7 @@ def main(argv=None):
     updated = transform(message, ticket)
     if updated != message:
         try:
-            open(path, "w", encoding="utf-8").write(updated)
+            atomic_write_text(path, updated)
         except OSError:
             return 0
     return 0

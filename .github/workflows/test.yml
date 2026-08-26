@@ -1,0 +1,71 @@
+name: test
+
+# 이 도구는 남의 레포에 CI 게이트를 심어주면서 정작 자기 자신은 CI 가 없었다.
+# templates/js/.github/workflows/post-merge-docs.yml 이 한 번도 설치된 적 없이
+# 레포에 들어 있었는데, 아무도 몰랐다.
+#
+# 브랜치를 고정하지 않는다. 템플릿 워크플로에 적용한 규칙을 자기 자신에게도 적용한다.
+#
+# 테스트는 임시 디렉터리에 실제로 init.sh 를 돌린다. 선택 의존성(pre-commit, ruff,
+# claude, codegraph)이 없는 러너에서도 통과해야 하며, 그 경로 자체가
+# OptionalDependencyTests 로 고정돼 있다. 그래서 여기서 아무것도 설치하지 않는다 —
+# 설치하면 "깨끗한 기계에서 도는가"를 더 이상 확인하지 못한다.
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  suite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 셸 문법
+        run: |
+          for script in init.sh scripts/*.sh templates/*/.claude/hooks/*.sh; do
+            bash -n "$script" || exit 1
+          done
+
+      - name: 회귀 스위트
+        run: python3 -m unittest discover -s tests -t tests -p 'test_*.py' -v
+
+      # PyYAML 은 표준 라이브러리가 아니고 러너에도 없다. gates.json 이 YAML 대신
+      # JSON 을 쓰는 이유와 같은 사실이다 (인터프리터 한 번 바뀌면 사라진다).
+      #
+      # 그래도 여기서는 설치해서 쓴다. 이건 대상 레포에 나가는 게이트가 아니라
+      # harness-init 자신의 검사이고, templates/ 의 워크플로는 이 레포에서 절대
+      # 실행되지 않아 문법이 깨져도 다른 데서 안 걸린다. 깨진 템플릿이 남의 레포에
+      # 깔리면 그 워크플로만 조용히 안 돈다.
+      #
+      # pre-commit·ruff 는 여기 절대 깔지 말 것. 그건 init.sh 가 없어도 동작해야
+      # 하는 선택 의존성이고, 러너에 미리 깔면 OptionalDependencyTests 가 실제로는
+      # 아무것도 확인하지 않게 된다.
+      - name: 워크플로 검사용 의존성
+        run: python3 -m pip install --quiet pyyaml
+
+      - name: 워크플로 YAML 유효성
+        run: |
+          python3 - <<'PY'
+          import pathlib, sys, yaml
+          bad = []
+          for path in sorted(pathlib.Path(".").rglob(".github/workflows/*.yml")):
+              try:
+                  yaml.safe_load(path.read_text(encoding="utf-8"))
+              except yaml.YAMLError as error:
+                  bad.append(f"{path}: {error}")
+          if bad:
+              print("\n".join(bad)); sys.exit(1)
+          print("워크플로 YAML 전부 유효")
+          PY

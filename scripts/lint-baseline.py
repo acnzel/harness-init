@@ -28,6 +28,8 @@ import shutil
 import subprocess
 import sys
 
+from atomic_write import atomic_write_text
+
 MARKER = "# harness-init:lint-baseline"
 
 
@@ -119,8 +121,7 @@ def apply_block(pyproject_path, counts):
         insert_at = section.end()
         text = text[:insert_at] + "\n" + block + text[insert_at:]
 
-    with open(pyproject_path, "w", encoding="utf-8") as f:
-        f.write(text)
+    atomic_write_text(pyproject_path, text)
 
 
 def main():

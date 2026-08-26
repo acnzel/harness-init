@@ -96,6 +96,12 @@ if IS_UNKNOWN_ENV; then
     success ".gitignore 생성 완료 (base-project)"
   fi
 
+  # 최소 하네스도 정식 설치다. 여기에 버전이 안 남으면 "이 레포에 무엇이 깔렸나"를
+  # 물었을 때 답이 없다.
+  if [ -f "$SCRIPT_DIR/VERSION" ]; then
+    printf '%s\n' "$(cat "$SCRIPT_DIR/VERSION")" > "$TARGET_DIR/.claude/harness-version"
+  fi
+
   success "최소 하네스 설치 완료"
   echo ""
   echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -178,7 +184,8 @@ fi
 # 훅·pre-commit·에이전트가 함께 호출하는 하네스 소유 코드라, 버전이 어긋나면
 # 게이트가 조용히 오작동한다. 재실행 시 항상 최신으로 맞춘다.
 mkdir -p "$TARGET_DIR/.claude/scripts"
-cp "$SCRIPT_DIR/scripts/domain-extract.py" \
+cp "$SCRIPT_DIR/scripts/atomic_write.py" \
+   "$SCRIPT_DIR/scripts/domain-extract.py" \
    "$SCRIPT_DIR/scripts/domain-gate.py" \
    "$SCRIPT_DIR/scripts/domain-freshness.py" \
    "$SCRIPT_DIR/scripts/hook-io.py" \
@@ -192,14 +199,14 @@ chmod +x "$TARGET_DIR/.claude/scripts/"*.py 2>/dev/null || true
 # 복사가 실패하면 기존 설치가 낡은 판정기를 그대로 쓰면서 설치는 성공으로 보고된다.
 # 이 하네스가 없애려는 실패 유형이 정확히 그것이라, 도착했는지 확인하고 알린다.
 _missing_tools=""
-for _t in domain-extract domain-gate domain-freshness hook-io gate-runner render-agents pr-body commit-msg; do
+for _t in atomic_write domain-extract domain-gate domain-freshness hook-io gate-runner render-agents pr-body commit-msg; do
   [ -f "$TARGET_DIR/.claude/scripts/$_t.py" ] || _missing_tools="$_missing_tools $_t.py"
 done
 if [ -n "$_missing_tools" ]; then
   warn "하네스 소유 도구 복사 실패:$_missing_tools"
   warn "  해당 게이트는 동작하지 않습니다. 권한·디스크 상태를 확인하고 재실행하세요."
 else
-  success "하네스 소유 도구 설치 완료 (.claude/scripts/ — domain-extract/domain-gate/domain-freshness/hook-io/gate-runner/render-agents/pr-body/commit-msg)"
+  success "하네스 소유 도구 설치 완료 (.claude/scripts/ — atomic_write/domain-extract/domain-gate/domain-freshness/hook-io/gate-runner/render-agents/pr-body/commit-msg)"
 fi
 
 # 게이트 선언은 사용자 소유다. 프로젝트마다 검사 목록이 다르고, 한번 손대면
@@ -724,6 +731,14 @@ if [ -d "$TARGET_DIR/.github/workflows" ]; then
       warn "  기존 것을 지우거나 gate-runner 호출로 바꾸세요."
     fi
   fi
+fi
+
+# ── 버전 기록 ──────────────────────────────────────────
+# 이 하네스는 재실행으로 갱신된다. 대상 레포에서 "지금 깔린 게 어느 판인가"를
+# 알 수 없으면, 버그를 고쳐도 그 레포가 갱신됐는지 확인할 방법이 없다.
+if [ -f "$SCRIPT_DIR/VERSION" ]; then
+  printf '%s\n' "$(cat "$SCRIPT_DIR/VERSION")" > "$TARGET_DIR/.claude/harness-version"
+  success "하네스 버전 기록 ($(cat "$SCRIPT_DIR/VERSION"))"
 fi
 
 # ── AGENTS.md 자동 구간 렌더 ───────────────────────────

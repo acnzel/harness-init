@@ -769,8 +769,13 @@ cp .claude/decisions/adr-template.md .claude/decisions/001-auth-strategy.md
 | Next.js / NestJS / Express | `templates/js/` | jest/vitest + factory functions + jest.spyOn | prettier + eslint + domain-gate | 선언 블록 지문 (TS enum / `as const` / 리터럴 union / Prisma) |
 
 JS/TS 환경은 Django 공통 파일(skills, commands, hooks, .gemini, docs)을 그대로 재사용하고,
-에이전트·rules·CLAUDE.md·DOMAIN.md·pre-commit·PR 테스트 워크플로우만 JS 전용으로 교체됩니다.
-(`pre-bash-guard.sh` 만 Django migrate 경고를 뺀 JS 버전으로 바뀝니다.)
+에이전트·rules·CLAUDE.md·DOMAIN.md·pre-commit·워크플로우(`pr-test.yml`, `post-merge-docs.yml`)만
+JS 전용으로 교체됩니다. (`pre-bash-guard.sh` 만 Django migrate 경고를 뺀 JS 버전으로 바뀝니다.)
+
+스택을 감지하지 못하면 위 두 계층 대신 `templates/base-project/` 의 최소 하네스만 깔고
+끝냅니다. CLAUDE.md, settings.json, 훅 2개, .gitignore 가 전부이며, 에이전트·게이트·지식
+계층은 설치되지 않습니다. `package.json` 이나 `manage.py` 를 만든 뒤 다시 실행하거나
+`ENV_TYPE=python|js` 로 명시하면 전체 설치로 넘어갑니다.
 
 훅은 스택 무관입니다. `domain-guard.sh` 가 `domain-gate.py` 에 위임하고, 그 안에서
 확장자에 따라 판정 방식이 갈립니다.
@@ -783,8 +788,12 @@ JS/TS 환경은 Django 공통 파일(skills, commands, hooks, .gemini, docs)을 
 harness-init/
 ├── README.md
 ├── CLAUDE.md                     ← harness-init 자체 개발 가이드
+├── CHANGELOG.md                  ← 대상 레포에 도착하는 것 기준의 변경 이력
+├── VERSION                       ← 설치 시 .claude/harness-version 에 기록
 ├── init.sh                       ← 메인 실행 스크립트
+├── tests/                        ← 회귀 스위트 (임시 레포에 실제로 init.sh 를 돌린다)
 ├── templates/
+│   ├── base-project/             ← 스택 미감지 시의 최소 하네스 (CLAUDE.md·settings.json·훅 2개)
 │   ├── django/                   ← Django/Python 전용 템플릿
 │   │   ├── CLAUDE.md             ← 레이어드 아키텍처 규칙 (Views→Services→Repositories)
 │   │   ├── .claude/
@@ -807,6 +816,7 @@ harness-init/
 │           ├── pr-test.yml               ← Node.js 20 + npm ci + npm test
 │           └── post-merge-docs.yml       ← 머지 후 API 문서 갱신 이슈 자동 생성
 └── scripts/
+    ├── atomic_write.py           ← 원자적 파일 교체 (render-agents·commit-msg·lint-baseline 공용)
     ├── domain-extract.py         ← AST로 Choices·시그널·db_table 추출 (LLM 미사용)
     ├── domain-gate.py            ← 의미 변화 판정, 훅·pre-commit·CI 공용
     ├── domain-freshness.py       ← DOMAIN.md가 소스보다 며칠 뒤처졌는지 측정

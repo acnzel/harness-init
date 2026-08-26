@@ -769,8 +769,13 @@ cp .claude/decisions/adr-template.md .claude/decisions/001-auth-strategy.md
 | Next.js / NestJS / Express | `templates/js/` | jest/vitest + factory functions + jest.spyOn | prettier + eslint + domain-gate | 선언 블록 지문 (TS enum / `as const` / 리터럴 union / Prisma) |
 
 JS/TS 환경은 Django 공통 파일(skills, commands, hooks, .gemini, docs)을 그대로 재사용하고,
-에이전트·rules·CLAUDE.md·DOMAIN.md·pre-commit·PR 테스트 워크플로우만 JS 전용으로 교체됩니다.
-(`pre-bash-guard.sh` 만 Django migrate 경고를 뺀 JS 버전으로 바뀝니다.)
+에이전트·rules·CLAUDE.md·DOMAIN.md·pre-commit·워크플로우(`pr-test.yml`, `post-merge-docs.yml`)만
+JS 전용으로 교체됩니다. (`pre-bash-guard.sh` 만 Django migrate 경고를 뺀 JS 버전으로 바뀝니다.)
+
+스택을 감지하지 못하면 위 두 계층 대신 `templates/base-project/` 의 최소 하네스만 깔고
+끝냅니다. CLAUDE.md, settings.json, 훅 2개, .gitignore 가 전부이며, 에이전트·게이트·지식
+계층은 설치되지 않습니다. `package.json` 이나 `manage.py` 를 만든 뒤 다시 실행하거나
+`ENV_TYPE=python|js` 로 명시하면 전체 설치로 넘어갑니다.
 
 훅은 스택 무관입니다. `domain-guard.sh` 가 `domain-gate.py` 에 위임하고, 그 안에서
 확장자에 따라 판정 방식이 갈립니다.
@@ -785,6 +790,7 @@ harness-init/
 ├── CLAUDE.md                     ← harness-init 자체 개발 가이드
 ├── init.sh                       ← 메인 실행 스크립트
 ├── templates/
+│   ├── base-project/             ← 스택 미감지 시의 최소 하네스 (CLAUDE.md·settings.json·훅 2개)
 │   ├── django/                   ← Django/Python 전용 템플릿
 │   │   ├── CLAUDE.md             ← 레이어드 아키텍처 규칙 (Views→Services→Repositories)
 │   │   ├── .claude/

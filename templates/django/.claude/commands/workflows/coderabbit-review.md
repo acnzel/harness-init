@@ -1,6 +1,6 @@
-# Gemini Code Assist Review Handler
+# CodeRabbit Review Handler
 
-You are an agent that handles Gemini Code Assist reviews on GitHub PRs. Your goal is to analyze review comments, selectively apply improvements (avoiding over-engineering), and respond with commit references.
+You are an agent that handles CodeRabbit reviews on GitHub PRs. Your goal is to analyze review comments, selectively apply improvements (avoiding over-engineering), and respond with commit references.
 
 ## Workflow
 
@@ -28,9 +28,9 @@ TICKET=$(git branch --show-current | grep -oE '[0-9]+' | head -1)
 gh pr list --json number,title,url --jq ".[] | select(.title | test(\"\\[.*${TICKET}.*\\]\"; \"i\"))"
 ```
 
-### Step 2: Fetch Gemini Code Assist Comments
+### Step 2: Fetch CodeRabbit Comments
 
-Get all review comments from Gemini Code Assist:
+Get all review comments from CodeRabbit:
 
 ```bash
 # Get PR number first
@@ -40,11 +40,12 @@ PR_NUMBER=$(gh pr view --json number -q '.number')
 gh api repos/:owner/:repo/pulls/$PR_NUMBER/comments
 ```
 
-Filter comments where `user.login` contains "gemini" or "google" (Gemini Code Assist bot).
+Filter comments where `user.login` is `coderabbitai[bot]` (CodeRabbit's bot account — 계정명이
+바뀔 수 있으니 안 잡히면 `"coderabbit"` 부분 문자열로도 확인할 것).
 
 ### Step 3: Analyze Each Comment
 
-For each Gemini comment, analyze and categorize:
+For each CodeRabbit comment, analyze and categorize:
 
 **Priority Categories (KISS / YAGNI / DRY 기준):**
 1. **Bug/Security** (HIGH): Actual bugs, security vulnerabilities, logic errors
@@ -63,14 +64,14 @@ For each Gemini comment, analyze and categorize:
 For each comment, present analysis and immediately proceed without asking:
 
 ```
-📝 Gemini Feedback #N
+📝 CodeRabbit Feedback #N
 ━━━━━━━━━━━━━━━━━━━━━
 File: {file_path}:{line_number}
 Category: {category}
 Priority: {priority}
 
 Comment:
-{gemini_comment_body}
+{coderabbit_comment_body}
 
 Analysis:
 {your_analysis_of_whether_this_is_valid_feedback_or_over_engineering}
@@ -97,7 +98,7 @@ After all approved changes are applied:
 ```bash
 git add -A
 # Use the Jira ticket ID from PR title (e.g., [DEV-2500])
-git commit -m "[${TICKET}] fix: apply Gemini code review feedback
+git commit -m "[${TICKET}] fix: apply CodeRabbit review feedback
 
 Applied:
 - {list of applied changes}
@@ -115,22 +116,24 @@ Capture the commit SHA:
 COMMIT_SHA=$(git rev-parse HEAD)
 ```
 
-### Step 7: Reply to Gemini Comments
+### Step 7: Reply to CodeRabbit Comments
 
-For each processed comment, **반드시** GitHub API로 답변을 남긴다. **답변 시작은 반드시 `@gemini-code-assist` 멘션으로 시작한다.**
+For each processed comment, **반드시** GitHub API로 답변을 남긴다. **답변 시작은 반드시 `@coderabbitai` 멘션으로 시작한다.** 답변 안에 `@coderabbitai resolve` 를 포함하면 CodeRabbit 이 해당 스레드를 자동으로 resolve 처리한다 (이미 반영한 코멘트에 한해서만 붙일 것 — SKIP 한 코멘트는 사람이 다시 보게 열어 둔다).
 
 **For applied changes:**
 ```bash
 gh api repos/:owner/:repo/pulls/$PR_NUMBER/comments/$COMMENT_ID/replies \
-  -f body="@gemini-code-assist ✅ Fixed in ${COMMIT_SHA:0:7}
+  -f body="@coderabbitai ✅ Fixed in ${COMMIT_SHA:0:7}
 
-{구체적으로 어떻게 수정했는지 간단히 설명}"
+{구체적으로 어떻게 수정했는지 간단히 설명}
+
+@coderabbitai resolve"
 ```
 
-**For skipped changes (KISS/YAGNI 근거 명시):**
+**For skipped changes (KISS/YAGNI 근거 명시, resolve 하지 않음):**
 ```bash
 gh api repos/:owner/:repo/pulls/$PR_NUMBER/comments/$COMMENT_ID/replies \
-  -f body="@gemini-code-assist ⏭️ Skipped
+  -f body="@coderabbitai ⏭️ Skipped
 
 {KISS/YAGNI/DRY 중 해당 원칙}: {구체적 사유}"
 ```
@@ -138,9 +141,11 @@ gh api repos/:owner/:repo/pulls/$PR_NUMBER/comments/$COMMENT_ID/replies \
 **For DRY fixes (중복 제거):**
 ```bash
 gh api repos/:owner/:repo/pulls/$PR_NUMBER/comments/$COMMENT_ID/replies \
-  -f body="@gemini-code-assist ✅ Fixed in ${COMMIT_SHA:0:7}
+  -f body="@coderabbitai ✅ Fixed in ${COMMIT_SHA:0:7}
 
-DRY: {어떤 중복을 어떻게 제거했는지 설명}"
+DRY: {어떤 중복을 어떻게 제거했는지 설명}
+
+@coderabbitai resolve"
 ```
 
 ## Important Guidelines
@@ -150,7 +155,7 @@ DRY: {어떤 중복을 어떻게 제거했는지 설명}"
 3. **DRY**: 실제 중복만 제거한다. 단, 중복 제거가 오히려 복잡성을 높이면 KISS를 우선한다
 4. **No Scope Creep**: 리뷰 피드백 범위를 넘는 리팩토링/기능 추가 금지
 5. **Preserve Intent**: 기존 코드의 의도와 스타일을 유지한다
-6. **Always Reply**: 모든 Gemini 코멘트에 반드시 답변을 남긴다. `@gemini-code-assist` 멘션으로 시작한다
+6. **Always Reply**: 모든 CodeRabbit 코멘트에 반드시 답변을 남긴다. `@coderabbitai` 멘션으로 시작한다
 
 ## Arguments
 
@@ -162,7 +167,7 @@ DRY: {어떤 중복을 어떻게 제거했는지 설명}"
 ## Example Usage
 
 ```
-/gemini-review              # Review current branch's PR
-/gemini-review DEV-2500     # Review PR with [DEV-2500] in title
-/gemini-review 123          # Review PR #123 directly
+/workflows:coderabbit-review              # Review current branch's PR
+/workflows:coderabbit-review DEV-2500     # Review PR with [DEV-2500] in title
+/workflows:coderabbit-review 123          # Review PR #123 directly
 ```

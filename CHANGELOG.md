@@ -12,6 +12,40 @@ harness-init 은 남의 레포에 주입되고 재실행으로 갱신된다. 그
 
 ---
 
+## 1.2.0
+
+kimsuhanmu 레포에 실제로 설치해 보고 발견한 세 가지 결함을 고쳤다. 전부 "재실행하면
+자동으로 따라온다"는 원칙대로, 기존 설치를 다시 실행하기만 하면 반영된다.
+
+### 수정
+
+- **JS 스택에서 기존 CLAUDE.md 를 통째로 지우던 결함.** `merge-claude-md.sh` 가
+  마커 앞에 보존한 프로젝트 고유 내용(서비스 정체성·절대 규칙·진행 상황)을, 그
+  직후 JS 오버라이드 단계가 `cp -f templates/js/CLAUDE.md` 로 다시 덮어써
+  {project_name} 같은 플레이스홀더투성이 템플릿으로 완전히 사라지게 했다
+  (kimsuhanmu 레포 실측 — 통계 기반 작명 서비스라는 정체성과 D9~D18 결정 이력이
+  통째로 날아갔다). 이제 마커 이전 구간(사용자 소유)만 보존하고 이후(harness
+  소유)만 JS 판으로 교체한다.
+- **JS 판 `.gitignore.append` 에 `.codegraph/`·`.claude/scripts/__pycache__/` 가
+  빠져 있던 결함.** django 판에만 있었다. 두 판이 같은 범용 블록(harness·AI 도구·
+  IDE·macOS·다이어그램·SQL 덤프 등)을 각각 통째로 들고 있던 게 원인이라, 한쪽만
+  고치면 다른 쪽이 조용히 낡았다. 범용 항목은 `templates/base-project/.gitignore.append`
+  하나로 합치고, django/js 는 스택 고유 델타만 갖는다.
+
+### 변경
+
+- **Gemini Code Assist → CodeRabbit.** Gemini Code Assist 는 개인 사용자 무료
+  제공이 끝나 더 이상 쓸 수 없다. `.gemini/config.yaml` + `.gemini/styleguide.md`
+  를 `.coderabbit.yaml` 하나로 합쳐 대체했다 (`path_filters` + `path_instructions`).
+  `/workflows:gemini-review` 커맨드도 `/workflows:coderabbit-review` 로 교체
+  (봇 계정 식별자, 재실행 시 `@coderabbitai resolve` 안내 추가). 1.2.0 이전 설치를
+  재실행하면 harness 가 심었던 `.gemini/`·`gemini-review.md` 를 지문으로 식별해
+  자동으로 지운다 — 사용자가 직접 만든 동명 설정은 건드리지 않는다.
+  (PR 자동 코드 리뷰 워크플로 `claude-code-review.yml` 은 Gemini 가 아니라
+  `anthropics/claude-code-action` 기반이라 이번 변경과 무관하다.)
+
+---
+
 ## 1.1.0
 
 실패 수집. 지금까지 `.claude/local/events-*.jsonl` 에 쌓이던 건 `gate_fired` 하나,

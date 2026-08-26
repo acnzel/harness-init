@@ -1,0 +1,110 @@
+# yaml-language-server: $schema=https://storage.googleapis.com/coderabbit_public_assets/schema.v2.json
+#
+# CodeRabbit 설정. Gemini Code Assist 는 개인 사용자에게 더 이상 무료로 제공되지
+# 않아 CodeRabbit 으로 대체했다 (harness-init 1.2.0). GitHub App 설치만으로 동작
+# 하고 별도 워크플로 파일이 필요 없다 — https://github.com/marketplace/coderabbitai
+# 에서 레포에 설치할 것. (PR 자동 코드 리뷰는 `claude-code-review.yml` 이 별도로
+# 돌린다 — 이 설정과 무관하다.)
+#
+# 정본 관계: path_instructions 아래 규칙의 정본은 `.claude/rules/architecture.md`·
+# `testing.md` 다. CodeRabbit 은 이 파일의 내용만 프롬프트로 받고 다른 파일 참조를
+# 따라가지 못하므로, 참조로 대체하지 않고 내용을 옮겨 적는다. 규칙을 바꾸면 정본과
+# 이 파일을 같은 커밋에서 함께 고칠 것 — 한쪽만 고치면 리뷰 봇이 낡은 기준으로
+# 지적한다.
+
+language: "ko-KR"
+
+reviews:
+  profile: "chill"
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+  auto_review:
+    enabled: true
+    drafts: false
+
+  path_filters:
+    # Python 자동 생성
+    - "!**/migrations/**"
+    - "!**/__pycache__/**"
+    - "!**/*.pyc"
+    - "!**/venv/**"
+    - "!**/.pytest_cache/**"
+    - "!**/htmlcov/**"
+    - "!**/.coverage"
+    # 의존성 / 빌드
+    - "!**/node_modules/**"
+    - "!**/package-lock.json"
+    - "!**/yarn.lock"
+    # IDE / 에디터
+    - "!**/.idea/**"
+    - "!**/.vscode/**"
+    - "!**/.DS_Store"
+    # 문서 / AI 설정 (리뷰 불필요)
+    - "!**/docs/**"
+    - "!**/.claude/**"
+    - "!**/CLAUDE.md"
+    - "!**/AGENTS.md"
+    # 데이터 / 덤프
+    - "!**/*.sql"
+    - "!**/*.gz"
+
+  path_instructions:
+    - path: "**/*.py"
+      instructions: |
+        ## Critical Rules (반드시 준수)
+
+        ### 1. Layered Architecture
+        Views → Services → Repositories 의존성 순서 엄수. View 에서 모델을 직접
+        조회/저장하면 반드시 지적할 것 (Service 경유 위반).
+
+        ```python
+        # Good
+        class MyView(APIView):
+            service = MyService()
+            def get(self, request):
+                return self.service.get_data(request.user)
+
+        # Bad - View에서 직접 DB 접근
+        class MyView(APIView):
+            def get(self, request):
+                return MyModel.objects.filter(user=request.user)  # 금지!
+        ```
+
+        ### 2. Test Data Creation
+        테스트 데이터 생성은 반드시 `utils/factories.py` 의 Factory 사용
+        (`Item.objects.create(...)` 직접 호출은 지적).
+
+        ### 3. Type Hints (필수)
+        모든 함수/메서드에 타입 힌트 필수 (mypy strict mode).
+
+        ### 4. QuerySet 최적화
+        `select_related`/`prefetch_related` 없이 반복문에서 관계 필드에 접근하는
+        N+1 패턴, `len(queryset) > 0` 대신 `.exists()` 를 안 쓰는 경우를 지적할 것.
+
+        ### 5. Error Handling
+        `except Exception: pass` 처럼 예외를 삼키는 코드를 지적할 것. 구체적인
+        예외 타입으로 처리해야 한다.
+
+        ## 네이밍 컨벤션
+        클래스 PascalCase, 함수/메서드 snake_case, 상수 UPPER_SNAKE_CASE.
+
+        ## KISS / YAGNI / DRY — 리뷰 원칙 (과도한 추상화 제안 자제)
+
+        다음은 제안하지 말 것 (SKIP):
+        - 1곳에서만 쓰이는 코드에 추상화 추가 (YAGNI)
+        - 아직 없는 Factory/Helper 클래스 신규 생성 요구 — 2곳 이상 쓰일 때만 분리
+        - "나중에 필요할 수도 있으니" 방어 설계 제안
+        - 단순한 코드를 복잡하게 만드는 리팩토링 (50줄을 100줄로 만들면 퇴보)
+        - 가능한 시나리오가 없는 에러 핸들링 추가
+        - 중복 제거가 오히려 복잡성을 높이는 DRY 제안 (KISS 우선)
+
+        다음은 반드시 지적할 것 (HIGH priority):
+        - 기존 코드베이스에 이미 있는 유틸리티를 새로 구현하는 코드
+        - N+1 쿼리, `select_related` 누락
+
+        ## 리뷰 코멘트 레벨
+        L1 요청사항(보안/버그/아키텍처 위반, 반드시 수정) · L2 권고사항(성능) ·
+        L3 질문사항(의도 확인) · L4 변경제안 · L5 참고의견(스타일/네이밍).

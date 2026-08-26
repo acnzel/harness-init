@@ -76,10 +76,19 @@ class DjangoInstallTests(HarnessTestCase):
         # 재실행으로 갱신되는 도구라, 대상 레포에서 어느 판이 깔렸는지 알아야
         # 버그를 고쳤을 때 그 레포가 따라왔는지 확인할 수 있다.
         stamped = self.read(".claude/harness-version").strip()
-        self.assertEqual(stamped, (ROOT / "VERSION").read_text(encoding="utf-8").strip())
+        self.assertEqual(
+            stamped, (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+        )
 
     def test_pyproject_is_present_for_python(self):
         self.assertInstalled("pyproject.toml")
+
+    def test_coderabbit_config_installed_and_gemini_removed(self):
+        # Gemini Code Assist 는 개인 사용자 무료 제공이 끝나 CodeRabbit 으로 대체했다
+        # (harness-init 1.2.0). 재발 방지: .gemini/ 가 다시 깔리면 안 된다.
+        self.assertInstalled(".coderabbit.yaml")
+        self.assertFalse((self.path / ".gemini").exists())
+        self.assertInstalled(".claude/commands/workflows/coderabbit-review.md")
 
 
 class JsInstallTests(HarnessTestCase):
@@ -109,6 +118,117 @@ class JsInstallTests(HarnessTestCase):
     def test_js_pre_bash_guard_has_no_django_migrate_warning(self):
         self.assertNotIn("makemigrations", self.read(".claude/hooks/pre-bash-guard.sh"))
 
+    def test_coderabbit_config_is_js_flavored_and_gemini_removed(self):
+        self.assertFalse((self.path / ".gemini").exists())
+        coderabbit = self.read(".coderabbit.yaml")
+        self.assertIn('path: "**/*.{ts,tsx}"', coderabbit)
+        self.assertNotIn('path: "**/*.py"', coderabbit)
+
+    def test_gitignore_has_both_shared_and_js_entries(self):
+        # base-project/.gitignore.append 와 js/.gitignore.append 가 각각 통째로
+        # 중복 관리되던 시절, js 판에만 `.codegraph/` 가 빠진 채로 낡아 있었다
+        # (kimsuhanmu 레포에서 실측 — 100MB+ codegraph 인덱스가 커밋 대상이 될 뻔함).
+        gitignore = self.read(".gitignore")
+        self.assertIn(".codegraph/", gitignore)
+        self.assertIn(".claude/scripts/__pycache__/", gitignore)
+        self.assertIn("node_modules/", gitignore)
+
+
+class JsClaudeMdPreservationTests(unittest.TestCase):
+    """JS 오버라이드가 기존 프로젝트 CLAUDE.md 를 지우면 안 된다.
+
+    harness-init 1.1.0 은 JS 스택에서 `cp -f templates/js/CLAUDE.md` 로 통째로
+    덮어써, 이미 있던 프로젝트 고유 내용(서비스 정체성·절대 규칙·진행 상황)이
+    {project_name} 같은 플레이스홀더투성이 템플릿으로 완전히 사라졌다
+    (kimsuhanmu 레포에서 실측). 재발 방지 회귀 테스트.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        import tempfile
+
+        cls._tmp = tempfile.TemporaryDirectory()
+        cls.path = make_fixture(Path(cls._tmp.name) / "fixture", "nextjs")
+        cls.marker_text = "이 서비스는 김수한무 — 사주 안 봄이 절대 규칙이다"
+        (cls.path / "CLAUDE.md").write_text(
+            f"# 기존 프로젝트 CLAUDE.md\n\n{cls.marker_text}\n", encoding="utf-8"
+        )
+        cls.result = run_init(cls.path, env_type="js")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    def read(self, relative):
+        return (self.path / relative).read_text(encoding="utf-8")
+
+    def test_install_succeeds(self):
+        self.assertEqual(self.result.returncode, 0, self.result.stderr[-2000:])
+
+    def test_existing_project_content_survives(self):
+        self.assertIn(self.marker_text, self.read("CLAUDE.md"))
+
+    def test_js_harness_section_still_applied(self):
+        # JS 아키텍처 규칙(Controller → Service → Repository)이 여전히 붙어야 한다 —
+        # 사용자 내용을 보존하려다 harness 섹션 자체가 안 붙는 회귀도 함께 잡는다.
+        self.assertIn("Controller → Service → Repository", self.read("CLAUDE.md"))
+
+    def test_reinstall_keeps_single_copy_of_user_content(self):
+        run_init(self.path, env_type="js")
+        content = self.read("CLAUDE.md")
+        self.assertEqual(content.count(self.marker_text), 1)
+
+
+class GeminiMigrationTests(unittest.TestCase):
+    """1.2.0 이전 설치(Gemini Code Assist)를 재실행하면 잔재가 지워져야 한다.
+
+    cp -rn/-n 은 새 파일만 추가하고 낡은 파일을 지우지 않는다. 정리 로직이 없으면
+    `.gemini/` 와 `/workflows:gemini-review` 가 CodeRabbit 설정과 나란히 영원히
+    남아, "재실행하면 자동으로 따라온다"는 이 하네스의 원칙이 깨진다.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        import tempfile
+
+        cls._tmp = tempfile.TemporaryDirectory()
+        cls.path = make_fixture(Path(cls._tmp.name) / "fixture", "nextjs")
+        gemini_dir = cls.path / ".gemini"
+        gemini_dir.mkdir()
+        (gemini_dir / "styleguide.md").write_text(
+            "이 문서는 Gemini Code Assist가 코드 리뷰 시 참조할 프로젝트 스타일 "
+            "가이드입니다.\n\n> 이 파일은 Gemini Code Assist 전용 파생본이다.\n",
+            encoding="utf-8",
+        )
+        (gemini_dir / "config.yaml").write_text("have_fun: false\n", encoding="utf-8")
+        commands_dir = cls.path / ".claude" / "commands" / "workflows"
+        commands_dir.mkdir(parents=True)
+        (commands_dir / "gemini-review.md").write_text(
+            "You are an agent that handles Gemini Code Assist reviews on GitHub PRs.\n",
+            encoding="utf-8",
+        )
+        cls.result = run_init(cls.path, env_type="js")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    def test_install_succeeds(self):
+        self.assertEqual(self.result.returncode, 0, self.result.stderr[-2000:])
+
+    def test_gemini_directory_removed(self):
+        self.assertFalse((self.path / ".gemini").exists())
+
+    def test_gemini_review_command_removed(self):
+        self.assertFalse(
+            (self.path / ".claude/commands/workflows/gemini-review.md").exists()
+        )
+
+    def test_coderabbit_review_command_installed(self):
+        self.assertTrue(
+            (self.path / ".claude/commands/workflows/coderabbit-review.md").is_file()
+        )
+
 
 class UnknownStackInstallTests(HarnessTestCase):
     stack = "unknown"
@@ -126,7 +246,9 @@ class UnknownStackInstallTests(HarnessTestCase):
     def test_version_is_stamped_on_the_minimal_path_too(self):
         # 최소 하네스도 정식 설치다. 여기만 버전이 없으면 "무엇이 깔렸나"에 답이 없다.
         stamped = self.read(".claude/harness-version").strip()
-        self.assertEqual(stamped, (ROOT / "VERSION").read_text(encoding="utf-8").strip())
+        self.assertEqual(
+            stamped, (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+        )
 
     def test_full_harness_is_skipped(self):
         # SKIP_FULL_INSTALL 가드가 풀리면 스택을 모르는 레포에 Django 하네스가 깔린다.
@@ -173,7 +295,7 @@ class WorkflowContractTests(unittest.TestCase):
         # fork PR 에서 시크릿이 노출된다. 주석에서 "쓰지 않는다"고 설명하는 것은
         # 위반이 아니므로 판정 전에 주석을 걷어낸다.
         for workflow in self.workflows:
-            body = strip_comments(workflow.read_text(encoding='utf-8'))
+            body = strip_comments(workflow.read_text(encoding="utf-8"))
             self.assertNotIn("pull_request_target", body, workflow.name)
 
 
@@ -206,7 +328,9 @@ class SelfCiTests(unittest.TestCase):
         """
         body = self.workflow.read_text(encoding="utf-8")
         if "import yaml" in body or "yaml.safe_load" in body:
-            self.assertIn("pip install --quiet pyyaml", body, "yaml 을 쓰면서 설치하지 않는다")
+            self.assertIn(
+                "pip install --quiet pyyaml", body, "yaml 을 쓰면서 설치하지 않는다"
+            )
 
     def test_workflow_installs_no_optional_dependency(self):
         """CI 에 pre-commit·ruff 를 깔면 '깨끗한 기계에서 도는가'를 못 보게 된다.

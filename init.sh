@@ -397,9 +397,16 @@ fi
 # 직접 만든 설정까지 건드리면 안 된다.
 if [ -f "$TARGET_DIR/.gemini/styleguide.md" ] && \
    grep -q '이 파일은 Gemini Code Assist 전용' "$TARGET_DIR/.gemini/styleguide.md" 2>/dev/null; then
-  rm -f "$TARGET_DIR/.gemini/styleguide.md" "$TARGET_DIR/.gemini/config.yaml"
+  # config.yaml 은 지우지 않는다 — 지문이 styleguide.md 에만 있어 config.yaml 자체가
+  # 사용자 수정본인지 독립적으로 확인할 방법이 없다. styleguide.md 만 지우면
+  # config.yaml 이 남아 .gemini/ 는 안 비워지지만(rmdir 스킵), 사용자 설정을
+  # 지울 위험보다 그쪽이 훨씬 싸다.
+  rm -f "$TARGET_DIR/.gemini/styleguide.md"
   rmdir "$TARGET_DIR/.gemini" 2>/dev/null || true
-  warn ".gemini/ 제거 완료 (Gemini Code Assist → CodeRabbit 대체, harness-init 1.2.0)"
+  warn ".gemini/styleguide.md 제거 완료 (Gemini Code Assist → CodeRabbit 대체, harness-init 1.2.0)"
+  if [ -f "$TARGET_DIR/.gemini/config.yaml" ]; then
+    warn "  .gemini/config.yaml 은 지문이 없어 남겨뒀습니다 — 더 이상 필요 없다면 직접 지우세요."
+  fi
 fi
 if [ -f "$TARGET_DIR/.claude/commands/workflows/gemini-review.md" ] && \
    grep -q 'Gemini Code Assist reviews' "$TARGET_DIR/.claude/commands/workflows/gemini-review.md" 2>/dev/null; then

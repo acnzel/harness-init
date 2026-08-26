@@ -39,8 +39,11 @@ kimsuhanmu 레포에 실제로 설치해 보고 발견한 세 가지 결함을 �
   를 `.coderabbit.yaml` 하나로 합쳐 대체했다 (`path_filters` + `path_instructions`).
   `/workflows:gemini-review` 커맨드도 `/workflows:coderabbit-review` 로 교체
   (봇 계정 식별자, 재실행 시 `@coderabbitai resolve` 안내 추가). 1.2.0 이전 설치를
-  재실행하면 harness 가 심었던 `.gemini/`·`gemini-review.md` 를 지문으로 식별해
-  자동으로 지운다 — 사용자가 직접 만든 동명 설정은 건드리지 않는다.
+  재실행하면 harness 가 심었던 `.gemini/styleguide.md`·`gemini-review.md` 를
+  지문으로 식별해 자동으로 지운다. `.gemini/config.yaml` 은 지문이 없어(내용이
+  일반적인 YAML 이라 사용자가 직접 고쳤어도 구분이 안 됨) 지우지 않고 남겨둔다 —
+  PR #30 CodeRabbit 리뷰가 지적한 대로, styleguide.md 지문만 보고 config.yaml
+  까지 같이 지우면 사용자가 손으로 고친 값이 백업 없이 사라질 수 있었다.
   (PR 자동 코드 리뷰 워크플로 `claude-code-review.yml` 은 Gemini 가 아니라
   `anthropics/claude-code-action` 기반이라 이번 변경과 무관하다.)
 
@@ -57,6 +60,28 @@ kimsuhanmu 레포에 실제로 설치해 보고 발견한 세 가지 결함을 �
   "이 항목이 비어 있으면 CLAUDE.md 도 반드시 읽어라"는 내용-없는 안내문만
   둔다 — 이건 창작이 아니라 참조라 안전하고, 사람이 실제 마이그레이션을 하기
   전까지 첫 실행부터 즉시 효과가 있다.
+
+### PR #30 CodeRabbit 리뷰 반영
+
+위 변경들을 PR로 올리자 CodeRabbit 이 실제로 5건을 지적했다. 전부 유효한 지적이었다.
+
+- **`.gemini/config.yaml` 도 지문 없이 같이 지우던 문제** (Major) — 위 "Gemini Code
+  Assist → CodeRabbit" 항목에 반영.
+- **`.coderabbit.yaml` 이 `.claude/rules/` 규칙을 통째로 옮겨 적던 중복** (Major) —
+  `knowledge_base.code_guidelines.filePatterns` 로 `.claude/rules/architecture.md`·
+  `testing.md` 를 직접 참조하도록 바꿨다. CodeRabbit 은 `CLAUDE.md`·`AGENTS.md` 는
+  자동 인식하지만 `.claude/rules/*` 는 그 목록에 없어서(CodeRabbit 공식 문서 확인)
+  명시적 참조가 필요했다 — path_instructions 에는 이제 두 문서에 없는 CodeRabbit
+  전용 지침(KISS/YAGNI/DRY 억제 기준, 리뷰 코멘트 레벨)만 남는다.
+- **README 가 "CodeRabbit 은 파일 참조를 못 따라간다"고 잘못 적은 것** (Minor) — 옛
+  Gemini 문구를 그대로 옮기면서 생긴 오류. 실제로는 CLAUDE.md·AGENTS.md 자동 인식 +
+  filePatterns 참조를 지원한다. 위 filePatterns 도입으로 이 절 자체를 다시 썼다.
+- **README 가 "하네스 설치" 단계를 스택 미감지 예외 없이 서술한 것** (Minor) — 스택을
+  감지 못하면 `.github/`·`.coderabbit.yaml` 없이 `base-project` 최소 하네스만 깐다는
+  점을 명시.
+- **AGENTS.md 안내문이 "Codex·Cursor 는 CLAUDE.md 를 안 읽는다"를 검증 안 된 사실로
+  단정한 것** (Minor) — git/설정에서 얻은 사실이 아니므로 제거하고, "이 항목이 비어
+  있으면 CLAUDE.md 도 읽어라"는 결정론적 지시만 남겼다.
 
 ---
 

@@ -217,7 +217,12 @@ class GeminiMigrationTests(unittest.TestCase):
             "가이드입니다.\n\n> 이 파일은 Gemini Code Assist 전용 파생본이다.\n",
             encoding="utf-8",
         )
-        (gemini_dir / "config.yaml").write_text("have_fun: false\n", encoding="utf-8")
+        cls.config_yaml_content = (
+            "have_fun: false\n# 우리 팀이 comment_severity_threshold 를 손으로 낮췄다\n"
+        )
+        (gemini_dir / "config.yaml").write_text(
+            cls.config_yaml_content, encoding="utf-8"
+        )
         commands_dir = cls.path / ".claude" / "commands" / "workflows"
         commands_dir.mkdir(parents=True)
         (commands_dir / "gemini-review.md").write_text(
@@ -233,8 +238,16 @@ class GeminiMigrationTests(unittest.TestCase):
     def test_install_succeeds(self):
         self.assertEqual(self.result.returncode, 0, self.result.stderr[-2000:])
 
-    def test_gemini_directory_removed(self):
-        self.assertFalse((self.path / ".gemini").exists())
+    def test_gemini_styleguide_removed(self):
+        self.assertFalse((self.path / ".gemini/styleguide.md").exists())
+
+    def test_user_modified_config_yaml_preserved(self):
+        # 지문은 styleguide.md 에만 있다. config.yaml 까지 같이 지우면(1.2.0 최초
+        # 릴리스의 실제 버그 — CodeRabbit PR #30 리뷰로 발견) 사용자가 손으로 고친
+        # 값(comment_severity_threshold 등)이 백업 없이 사라진다.
+        config = self.path / ".gemini/config.yaml"
+        self.assertTrue(config.exists(), "지문 없는 config.yaml 이 함께 삭제됐다")
+        self.assertEqual(config.read_text(encoding="utf-8"), self.config_yaml_content)
 
     def test_gemini_review_command_removed(self):
         self.assertFalse(

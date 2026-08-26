@@ -83,6 +83,7 @@ bash ~/harness-init/init.sh
 1. **환경 선택** — Python / JS·TS / 자동 감지 중 선택해 스택별 설정 분기
 2. **스택 감지** — `manage.py` / `requirements.txt` / `package.json` 등으로 기술 스택 식별
 3. **하네스 설치** — Django/JS 템플릿 기반으로 `.claude/`, `.github/`, `.coderabbit.yaml` 구성
+   (스택을 감지하지 못하면 이 전체 설치 대신 `templates/base-project/` 최소 하네스만 깔린다 — 아래 "지원 환경" 참조)
 4. **pre-commit 설치** — Python: ruff, JS·TS: prettier + eslint (자동 설치·등록)
 5. **스택 마이그레이션** — 비 Django 스택이면 `migration.sh`가 내용을 해당 스택으로 자동 변환
 6. **구조 지식 계층** — `codegraph-setup.sh`가 인덱싱 + MCP 등록 (`.mcp.json`). codegraph 미설치면 안내 후 건너뜀
@@ -281,7 +282,7 @@ GitHub 이 오류를 표시하므로, 팀 핸들을 채운 뒤 `#` 을 지워 �
 | `AGENTS.md` | 모든 에이전트 (Claude·Codex·Cursor·OpenCode) | 작업 원칙, 절대 규칙, 권한·경계 |
 | `CLAUDE.md` | Claude Code | 환경 설정, `@import`, 인사이트 규칙 |
 | `.claude/rules/*.md` | 정본을 참조하는 모두 | 아키텍처·테스트·도메인·훅 상세 |
-| `.coderabbit.yaml` | CodeRabbit | 리뷰 기준 (`path_instructions`, 파생본) |
+| `.coderabbit.yaml` | CodeRabbit | 리뷰 기준. `knowledge_base.code_guidelines.filePatterns` 로 `.claude/rules/*` 를 참조(파생본 아님) |
 
 `CLAUDE.md` 는 작업 원칙을 다시 적지 않고 `AGENTS.md` 를 가리킵니다.
 
@@ -312,12 +313,18 @@ python3 .claude/scripts/render-agents.py --repo . --check    # 낡았으면 exit
 Codex·Cursor 는 그 파일을 읽지 않으므로 `AGENTS.md` 에 글로도 있어야 전달됩니다. 중복이
 아니라 다른 청중을 위한 유일한 경로라서, 손으로 옮겨 적는 대신 같은 원본에서 생성합니다.
 
-### 남아 있는 중복
+### CodeRabbit 참조 (더 이상 중복 아님)
 
-`.coderabbit.yaml` 의 `path_instructions` 는 `.claude/rules/` 의 레이어·테스트 규칙을
-다시 씁니다. CodeRabbit 은 이 파일의 내용만 프롬프트로 받고 파일 참조를 따라가지 못해서,
-참조로 대체하면 리뷰 품질이 떨어집니다. 없앨 수 없는 중복이므로 파일 상단에 정본 관계를
-명시하고 **같은 커밋에서 함께 고칠 것**을 요구합니다.
+`.coderabbit.yaml` 은 예전에 `path_instructions` 에 `.claude/rules/architecture.md`·
+`testing.md` 의 레이어·테스트 규칙을 통째로 옮겨 적었습니다(PR #30, CodeRabbit 리뷰가
+직접 지적). CodeRabbit 은 `CLAUDE.md`·`AGENTS.md` 는 자동으로 인식하지만
+[`.claude/rules/*` 는 그 자동 인식 목록에 없어서](https://docs.coderabbit.ai/knowledge-base/code-guidelines)
+`knowledge_base.code_guidelines.filePatterns` 로 명시적으로 참조를 걸어 둡니다 — 옮겨
+적지 않고 가리키기만 하므로 규칙 문서를 고쳐도 이 파일은 따로 손댈 필요가 없습니다.
+
+`path_instructions` 에는 저 두 문서에 없는, CodeRabbit 리뷰 전용 지침(KISS/YAGNI/DRY
+억제 기준, 리뷰 코멘트 레벨 등)만 남아 있습니다. 이건 중복이 아니라 "금지 명령"과
+같은 이유입니다 — CodeRabbit 만 필요로 하는 내용이라 다른 문서로 옮길 대상이 없습니다.
 
 ---
 

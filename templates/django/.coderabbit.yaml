@@ -6,13 +6,25 @@
 # 에서 레포에 설치할 것. (PR 자동 코드 리뷰는 `claude-code-review.yml` 이 별도로
 # 돌린다 — 이 설정과 무관하다.)
 #
-# 정본 관계: path_instructions 아래 규칙의 정본은 `.claude/rules/architecture.md`·
-# `testing.md` 다. CodeRabbit 은 이 파일의 내용만 프롬프트로 받고 다른 파일 참조를
-# 따라가지 못하므로, 참조로 대체하지 않고 내용을 옮겨 적는다. 규칙을 바꾸면 정본과
-# 이 파일을 같은 커밋에서 함께 고칠 것 — 한쪽만 고치면 리뷰 봇이 낡은 기준으로
-# 지적한다.
+# 정본 관계: 레이어드 아키텍처·테스트 규칙의 정본은 `.claude/rules/architecture.md`·
+# `testing.md` 다. CodeRabbit 은 CLAUDE.md·AGENTS.md 는 자동으로 인식하지만
+# `.claude/rules/*` 는 자동 인식 목록에 없어서, 아래 knowledge_base.code_guidelines
+# .filePatterns 로 명시적으로 참조를 걸어 둔다 — 내용을 옮겨 적지 않고 참조만 한다.
+# path_instructions 에는 저 두 파일에 없는, CodeRabbit 리뷰 전용 지침(KISS/YAGNI/DRY
+# 억제 기준, 리뷰 코멘트 레벨, 타입 힌트·에러 핸들링·QuerySet 최적화처럼 이 프로젝트
+# 규칙 문서엔 없는 세부 관례)만 남긴다. `.claude/rules/*` 를 고치면 이 파일은
+# 자동으로 최신을 참조하므로 같이 고칠 필요가 없다 — 남은 path_instructions 를
+# 고칠 때만 규칙 문서와 내용이 겹치지 않는지 확인할 것.
 
 language: "ko-KR"
+
+knowledge_base:
+  code_guidelines:
+    filePatterns:
+      - files: ".claude/rules/architecture.md"
+        applyTo: "**/*.py"
+      - files: ".claude/rules/testing.md"
+        applyTo: "**/*.py"
 
 reviews:
   profile: "chill"
@@ -56,35 +68,18 @@ reviews:
       instructions: |
         ## Critical Rules (반드시 준수)
 
-        ### 1. Layered Architecture
-        Views → Services → Repositories 의존성 순서 엄수. View 에서 모델을 직접
-        조회/저장하면 반드시 지적할 것 (Service 경유 위반).
+        레이어드 아키텍처(Views → Services → Repositories)와 테스트 데이터 생성
+        (Factory 전용) 규칙은 knowledge_base 로 참조하는 `.claude/rules/architecture.md`·
+        `testing.md` 를 따를 것 — 위반 시 그 문서를 근거로 지적한다.
 
-        ```python
-        # Good
-        class MyView(APIView):
-            service = MyService()
-            def get(self, request):
-                return self.service.get_data(request.user)
-
-        # Bad - View에서 직접 DB 접근
-        class MyView(APIView):
-            def get(self, request):
-                return MyModel.objects.filter(user=request.user)  # 금지!
-        ```
-
-        ### 2. Test Data Creation
-        테스트 데이터 생성은 반드시 `utils/factories.py` 의 Factory 사용
-        (`Item.objects.create(...)` 직접 호출은 지적).
-
-        ### 3. Type Hints (필수)
+        ### 1. Type Hints (필수)
         모든 함수/메서드에 타입 힌트 필수 (mypy strict mode).
 
-        ### 4. QuerySet 최적화
+        ### 2. QuerySet 최적화
         `select_related`/`prefetch_related` 없이 반복문에서 관계 필드에 접근하는
         N+1 패턴, `len(queryset) > 0` 대신 `.exists()` 를 안 쓰는 경우를 지적할 것.
 
-        ### 5. Error Handling
+        ### 3. Error Handling
         `except Exception: pass` 처럼 예외를 삼키는 코드를 지적할 것. 구체적인
         예외 타입으로 처리해야 한다.
 

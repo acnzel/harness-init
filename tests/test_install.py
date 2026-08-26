@@ -230,6 +230,39 @@ class GeminiMigrationTests(unittest.TestCase):
         )
 
 
+class UserOwnedGeminiConfigSurvivesTests(unittest.TestCase):
+    """지문이 없는 `.gemini/` 는 harness 가 심은 게 아니라 사용자 소유일 수 있다.
+
+    지문 검사 없이 이름만 보고 지우면 harness 와 무관한 사용자 설정을 삭제하는
+    회귀가 생긴다. GeminiMigrationTests(지문 있음 → 삭제)와 짝을 이루는 반대쪽
+    사례: 지문 없음 → 보존.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        import tempfile
+
+        cls._tmp = tempfile.TemporaryDirectory()
+        cls.path = make_fixture(Path(cls._tmp.name) / "fixture", "nextjs")
+        gemini_dir = cls.path / ".gemini"
+        gemini_dir.mkdir()
+        cls.user_content = "이건 harness 와 무관한 내 개인 Gemini CLI 설정이다.\n"
+        (gemini_dir / "styleguide.md").write_text(cls.user_content, encoding="utf-8")
+        cls.result = run_init(cls.path, env_type="js")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls._tmp.cleanup()
+
+    def test_install_succeeds(self):
+        self.assertEqual(self.result.returncode, 0, self.result.stderr[-2000:])
+
+    def test_user_owned_gemini_file_is_not_touched(self):
+        target = self.path / ".gemini" / "styleguide.md"
+        self.assertTrue(target.exists(), "지문 없는 사용자 파일이 삭제됐다")
+        self.assertEqual(target.read_text(encoding="utf-8"), self.user_content)
+
+
 class UnknownStackInstallTests(HarnessTestCase):
     stack = "unknown"
     env_type = "auto"

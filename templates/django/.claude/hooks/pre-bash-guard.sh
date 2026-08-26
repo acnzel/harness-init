@@ -65,6 +65,9 @@ if echo "$CMD" | grep -q "python manage.py test" && ! echo "$CMD" | grep -q "pyt
   echo ""
 fi
 
+# 게이트 우회 감지. 판정은 _hook-input.sh 한 곳에 있다 (양쪽 훅이 공유).
+hook_report_bypass "$CMD"
+
 # 발화를 기록한다. 게이트의 침묵이 '안전'인지 '고장'인지는 기록이 있어야 구분된다.
 [ -n "$FIRED" ] && hook_event gate_fired pre-bash-guard.sh "$FIRED |$CMD"
 

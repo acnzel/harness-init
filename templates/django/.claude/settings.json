@@ -32,6 +32,7 @@
       "Bash(python3 .claude/scripts/domain-gate.py:*)",
       "Bash(python3 .claude/scripts/domain-extract.py:*)",
       "Bash(python3 .claude/scripts/domain-freshness.py:*)",
+      "Bash(python3 .claude/scripts/failure-report.py:*)",
       "Bash(bash .claude/hooks/gate-selftest.sh:*)"
     ],
     "deny": [

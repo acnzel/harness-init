@@ -10,6 +10,7 @@
 # 제공하는 것:
 #   hook_input_load   stdin 을 소비하고 HOOK_* 변수를 채운다
 #   hook_event        발화를 .claude/local/events-YYYY-MM.jsonl 에 기록한다
+#   hook_report_bypass 게이트 우회를 감지해 기록한다 (막지는 않는다)
 #
 # 사용 예:
 #   source "$(dirname "${BASH_SOURCE[0]}")/_hook-input.sh"
@@ -69,5 +70,52 @@ hook_event() {
 		--session "${HOOK_SESSION:-}" \
 		--detail "${3:-}" \
 		--repo "${CLAUDE_PROJECT_DIR:-$PWD}" >/dev/null 2>&1 || true
+	return 0
+}
+
+
+# ── 게이트 우회 감지 ───────────────────────────────────
+# 우회는 금지가 아니라 **표면화 대상**이다. 이 문장은 AGENTS.md 자동 구간,
+# domain-gate 차단 메시지, 양쪽 rules/knowledge.md 까지 다섯 곳에 적혀 있었는데
+# 기록하는 코드가 없었다. 그래서 우회가 일어났어도 남지 않는다.
+#
+# 여기 한 곳에만 둔다. django·js pre-bash-guard 가 각자 판정하면 한쪽만 고쳐지고
+# 다른 쪽이 조용히 낡는다 — 이 파일이 stdin 파싱을 한 곳에 모은 것과 같은 이유다.
+# (실제로 우회 감지를 django 판에만 넣었다가 js 가 빠진 적이 있다.)
+#
+# 막지 않는다. 막으면 우회의 우회를 학습시킨다.
+#
+# 사용: hook_report_bypass "$CMD"   → 감지 시 안내를 출력하고 기록, 항상 0 반환
+hook_report_bypass() {
+	local cmd="$1"
+	local bypass=""
+
+	[ -n "$cmd" ] || return 0
+
+	# 커밋·푸시 게이트를 건너뛰는 플래그만 본다. `-n` 은 수많은 명령의 평범한
+	# 플래그라 git commit/push 문맥에서만 우회로 친다.
+	case "$cmd" in
+	*git\ commit*|*git\ push*)
+		case "$cmd" in
+		*--no-verify*|*" -n "*|*" -n") bypass="no-verify" ;;
+		esac
+		;;
+	esac
+
+	# pre-commit 의 훅 선택적 건너뛰기.
+	case "$cmd" in
+	SKIP=*|*" SKIP="*) bypass="${bypass:+$bypass,}pre-commit-SKIP" ;;
+	esac
+
+	# --no-gpg-sign 은 게이트를 건너뛰지 않는다. 여기서 걸리지 않도록 둔다.
+
+	[ -n "$bypass" ] || return 0
+
+	echo ""
+	echo "📝 게이트 우회 기록됨: $bypass"
+	echo "   막지는 않습니다. 다만 PR 설명에 사유를 남기세요."
+	echo "   누적 확인: python3 .claude/scripts/failure-report.py"
+	echo ""
+	hook_event bypass_used pre-bash-guard.sh "$bypass |$cmd" || true
 	return 0
 }

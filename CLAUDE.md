@@ -25,6 +25,7 @@ harness-init/
 │   └── js/                 ← JS/TS 오버라이드 (django/ 위에 덮어쓰기)
 └── scripts/
     ├── atomic_write.py     ← 원자적 파일 교체 (사람이 쓴 파일을 덮어쓰는 셋이 공용, 하네스 소유)
+    ├── failure-report.py   ← 실패 이벤트를 재발 패턴으로 묶는다 (하네스 소유)
     ├── domain-init.sh      ← DOMAIN.md 스켈레톤 생성
     ├── domain-fill.sh      ← Claude Code로 DOMAIN.md 채우기
     ├── domain-extract.py   ← Choices·db_table·시그널 AST 추출 (stdlib ast, LLM 미사용)
@@ -148,6 +149,10 @@ django 판이 깔린 채 조용히 오작동한다 (`post-merge-docs.yml` 이 �
 
 - 파싱은 `_hook-input.sh` 의 `hook_input_load` 에만 둔다. 훅에서 직접 JSON 을 까지 말 것 —
   훅마다 각자 파싱하면 같은 불일치가 재발한다.
+- **여러 스택이 공유하는 판정도 같은 자리에 둔다.** django·js 가 각각 `pre-bash-guard.sh`
+  를 갖고 있어서, 한쪽에만 넣으면 다른 쪽이 조용히 낡는다. 우회 감지를 django 판에만
+  넣었다가 js 가 빠진 적이 있다 (`hook_report_bypass` 가 그래서 `_hook-input.sh` 에 있다).
+  `_hook-input.sh` 는 django 템플릿에서 한 번만 설치되어 양쪽이 함께 쓴다.
 - `settings.json` 에 **인라인 셸 훅을 넣지 말 것**. JSON 이스케이프 안에서는 stdin 파싱이
   불가능해 필연적으로 환경변수를 읽게 된다. 파일 훅으로 만들고 경로만 등록한다.
 - 새 게이트를 추가하면 `gate-selftest.sh` 에 **positive/negative 쌍**을 함께 추가한다.
@@ -260,6 +265,7 @@ python3 -m unittest discover -s tests -t tests -p 'test_*.py'
 | `test_docs_consistency.py` | 문서의 트리·단계 목록이 실물과 같은가 |
 | `test_atomic_write.py` | 쓰기 중단 시 사람이 쓴 파일이 살아남는가 |
 | `test_bootstrap.py` | 새 클론에서 로컬 게이트 부재가 발화하는가 |
+| `test_failure_collection.py` | 우회·차단이 기록되는가, 보고서가 재발을 가려내는가 |
 
 **새 검사를 추가할 때는 뮤테이션으로 확인한다.** 가드를 되돌렸을 때 실제로 빨간불이
 뜨는지 보지 않으면, 아무것도 검증하지 않는 테스트가 초록불로 남는다. 실제로 단계

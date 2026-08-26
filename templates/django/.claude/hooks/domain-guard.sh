@@ -27,6 +27,13 @@ STATUS=$?
 # 커밋 시점에는 pre-commit 이 같은 오류로 차단하므로 고장 자체는 드러난다.
 if [ "$STATUS" -eq 1 ]; then
   echo "$OUTPUT" >&2
+  # 차단을 기록한다. 무엇이 몇 번 막았는지를 알아야 과차단하는 게이트를 찾는다.
+  # 계측은 차단을 지연시키지 않는다 — 실패해도 || true 로 흘린다.
+  HOOKIO="$PROJECT_DIR/.claude/scripts/hook-io.py"
+  [ -f "$HOOKIO" ] && python3 "$HOOKIO" event \
+    --event gate_blocked --source domain-guard.sh \
+    --detail "domain-gate |$(printf '%s' "$OUTPUT" | head -c 200)" \
+    --repo "$PROJECT_DIR" >/dev/null 2>&1 || true
   exit 2
 fi
 

@@ -817,6 +817,7 @@ harness-init/
 │           └── post-merge-docs.yml       ← 머지 후 API 문서 갱신 이슈 자동 생성
 └── scripts/
     ├── atomic_write.py           ← 원자적 파일 교체 (render-agents·commit-msg·lint-baseline 공용)
+    ├── failure-report.py         ← 우회·차단·게이트 실패를 재발 패턴으로 묶는다
     ├── domain-extract.py         ← AST로 Choices·시그널·db_table 추출 (LLM 미사용)
     ├── domain-gate.py            ← 의미 변화 판정, 훅·pre-commit·CI 공용
     ├── domain-freshness.py       ← DOMAIN.md가 소스보다 며칠 뒤처졌는지 측정

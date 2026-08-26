@@ -193,20 +193,21 @@ cp "$SCRIPT_DIR/scripts/atomic_write.py" \
    "$SCRIPT_DIR/scripts/render-agents.py" \
    "$SCRIPT_DIR/scripts/pr-body.py" \
    "$SCRIPT_DIR/scripts/commit-msg.py" \
+   "$SCRIPT_DIR/scripts/failure-report.py" \
    "$TARGET_DIR/.claude/scripts/" 2>/dev/null || true
 chmod +x "$TARGET_DIR/.claude/scripts/"*.py 2>/dev/null || true
 
 # 복사가 실패하면 기존 설치가 낡은 판정기를 그대로 쓰면서 설치는 성공으로 보고된다.
 # 이 하네스가 없애려는 실패 유형이 정확히 그것이라, 도착했는지 확인하고 알린다.
 _missing_tools=""
-for _t in atomic_write domain-extract domain-gate domain-freshness hook-io gate-runner render-agents pr-body commit-msg; do
+for _t in atomic_write domain-extract domain-gate domain-freshness hook-io gate-runner render-agents pr-body commit-msg failure-report; do
   [ -f "$TARGET_DIR/.claude/scripts/$_t.py" ] || _missing_tools="$_missing_tools $_t.py"
 done
 if [ -n "$_missing_tools" ]; then
   warn "하네스 소유 도구 복사 실패:$_missing_tools"
   warn "  해당 게이트는 동작하지 않습니다. 권한·디스크 상태를 확인하고 재실행하세요."
 else
-  success "하네스 소유 도구 설치 완료 (.claude/scripts/ — atomic_write/domain-extract/domain-gate/domain-freshness/hook-io/gate-runner/render-agents/pr-body/commit-msg)"
+  success "하네스 소유 도구 설치 완료 (.claude/scripts/ — atomic_write/domain-extract/domain-gate/domain-freshness/hook-io/gate-runner/render-agents/pr-body/commit-msg/failure-report)"
 fi
 
 # 게이트 선언은 사용자 소유다. 프로젝트마다 검사 목록이 다르고, 한번 손대면

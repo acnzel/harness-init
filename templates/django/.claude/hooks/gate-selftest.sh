@@ -183,12 +183,16 @@ fi
 # CI 의 gate-runner 가 PR 에서 받는다 — 늦게 걸릴 뿐 안 걸리지는 않는다.
 if [ ! -f "$PROJECT_DIR/.pre-commit-config.yaml" ]; then
 	skip "pre-commit 설정 없음 — 로컬 게이트 대상 아님"
-elif [ ! -d "$PROJECT_DIR/.git" ]; then
+elif ! HOOKS_DIR=$(git -C "$PROJECT_DIR" rev-parse --git-path hooks 2>/dev/null); then
 	skip "git 저장소 아님 — 로컬 훅 부트스트랩 확인 생략"
 else
+	case "$HOOKS_DIR" in
+	/*) : ;;
+	*) HOOKS_DIR="$PROJECT_DIR/$HOOKS_DIR" ;;
+	esac
 	MISSING_HOOKS=""
 	for _h in pre-commit pre-push commit-msg; do
-		if ! grep -q 'pre-commit' "$PROJECT_DIR/.git/hooks/$_h" 2>/dev/null; then
+		if ! grep -q 'pre-commit' "$HOOKS_DIR/$_h" 2>/dev/null; then
 			MISSING_HOOKS="$MISSING_HOOKS $_h"
 		fi
 	done

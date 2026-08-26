@@ -55,7 +55,8 @@ class ReinstallTests(unittest.TestCase):
         gates["_mine"] = "우리 팀이 고친 것"
         gates_path.write_text(json.dumps(gates, indent=2), encoding="utf-8")
 
-        run_init(self.path, env_type="python")
+        second = run_init(self.path, env_type="python")
+        self.assertEqual(second.returncode, 0, second.stderr[-2000:])
 
         after = json.loads(gates_path.read_text(encoding="utf-8"))
         self.assertEqual(
@@ -72,7 +73,8 @@ class ReinstallTests(unittest.TestCase):
         )
         agents_path.write_text(marked, encoding="utf-8")
 
-        run_init(self.path, env_type="python")
+        second = run_init(self.path, env_type="python")
+        self.assertEqual(second.returncode, 0, second.stderr[-2000:])
 
         after = agents_path.read_text(encoding="utf-8")
         self.assertIn("## 우리 팀 규칙", after)
@@ -104,7 +106,8 @@ class ReinstallTests(unittest.TestCase):
         mine = self.path / ".claude/hooks/our-own-hook.sh"
         mine.write_text("#!/bin/bash\necho 우리것\n", encoding="utf-8")
 
-        run_init(self.path, env_type="python")
+        second = run_init(self.path, env_type="python")
+        self.assertEqual(second.returncode, 0, second.stderr[-2000:])
 
         self.assertTrue(mine.is_file(), "사용자 훅이 사라졌다")
         self.assertIn("우리것", mine.read_text(encoding="utf-8"))
@@ -116,9 +119,11 @@ class UnknownStackReinstallTests(unittest.TestCase):
     def test_reinstall_is_byte_identical(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = make_fixture(Path(tmp) / "fx", "unknown")
-            run_init(path, env_type="auto")
+            first = run_init(path, env_type="auto")
+            self.assertEqual(first.returncode, 0, first.stderr[-2000:])
             before = tree_snapshot(path)
-            run_init(path, env_type="auto")
+            second = run_init(path, env_type="auto")
+            self.assertEqual(second.returncode, 0, second.stderr[-2000:])
             self.assertEqual(tree_snapshot(path), before)
 
 

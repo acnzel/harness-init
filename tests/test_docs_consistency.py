@@ -53,7 +53,9 @@ class StepListTests(unittest.TestCase):
         section = CLAUDE_MD.split("## init.sh 구조 (단계 순서)")[1]
         section = section.split("### 순서가 고정된 지점")[0]
         numbers = [int(n) for n in re.findall(r"^(\d+)\.\s+\*\*", section, re.M)]
-        self.assertEqual(numbers, list(range(1, len(numbers) + 1)), "단계 번호가 끊겼다")
+        self.assertEqual(
+            numbers, list(range(1, len(numbers) + 1)), "단계 번호가 끊겼다"
+        )
 
     def test_constraint_table_points_at_real_steps(self):
         """순서 제약 표가 존재하지 않는 단계 번호를 가리키면 안 된다.
@@ -101,6 +103,13 @@ class DirectoryTreeTests(unittest.TestCase):
             item.name for item in (ROOT / "templates").iterdir() if item.is_dir()
         )
 
+    def tree_block(self, document):
+        """`└── scripts/` 를 담은 코드 펜스 전체 — templates/ 계층도 같은 펜스 안에 있다."""
+        marker = document.index("└── scripts/")
+        start = document.rindex("```", 0, marker) + 3
+        end = document.index("```", marker)
+        return document[start:end]
+
     def documented_scripts(self, document):
         block = document.split("└── scripts/")[1].split("```")[0]
         return sorted(set(re.findall(r"[a-z][a-z_-]*\.(?:sh|py)", block)))
@@ -113,11 +122,12 @@ class DirectoryTreeTests(unittest.TestCase):
 
     def test_both_documents_mention_every_template_layer(self):
         for name, document in (("CLAUDE.md", CLAUDE_MD), ("README.md", README_MD)):
+            block = self.tree_block(document)
             for layer in self.actual_template_layers():
                 self.assertIn(
                     f"{layer}/",
-                    document,
-                    f"{name} 에 templates/{layer}/ 계층이 없다",
+                    block,
+                    f"{name} 의 구조 트리에 templates/{layer}/ 계층이 없다",
                 )
 
 

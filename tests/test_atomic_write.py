@@ -50,7 +50,8 @@ class AtomicWriteTests(unittest.TestCase):
                 atomic_write_text(self.path, "새 내용\n")
 
         self.assertEqual(
-            self.path.read_text(encoding="utf-8"), original,
+            self.path.read_text(encoding="utf-8"),
+            original,
             "쓰기 실패 후 원본이 훼손됐다",
         )
 
@@ -58,7 +59,9 @@ class AtomicWriteTests(unittest.TestCase):
         original = "팀이 쓴 절대 규칙\n"
         self.path.write_text(original, encoding="utf-8")
 
-        with mock.patch.object(atomic_write.os, "replace", side_effect=OSError("EACCES")):
+        with mock.patch.object(
+            atomic_write.os, "replace", side_effect=OSError("EACCES")
+        ):
             with self.assertRaises(OSError):
                 atomic_write_text(self.path, "새 내용\n")
 
@@ -95,8 +98,19 @@ class AtomicWriteTests(unittest.TestCase):
 
     def test_temporary_file_lands_in_target_directory(self):
         # /tmp 를 쓰면 파일시스템이 달라져 os.replace 가 원자적 rename 이 아니게 된다.
-        source = (ROOT / "scripts/atomic_write.py").read_text(encoding="utf-8")
-        self.assertIn("dir=directory", source)
+        real_factory = atomic_write.tempfile.NamedTemporaryFile
+        seen_dirs = []
+
+        def spying_factory(*args, **kwargs):
+            seen_dirs.append(kwargs.get("dir"))
+            return real_factory(*args, **kwargs)
+
+        with mock.patch.object(
+            atomic_write.tempfile, "NamedTemporaryFile", side_effect=spying_factory
+        ):
+            atomic_write_text(self.path, "새 내용\n")
+
+        self.assertEqual(seen_dirs, [self.path.parent])
 
 
 class ShippedWithHarnessTests(unittest.TestCase):

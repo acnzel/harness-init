@@ -389,12 +389,35 @@ PYEOF
   fi
 fi
 
-# .gemini 복사
-if [ -d "$TEMPLATE_DIR/django/.gemini" ]; then
-  mkdir -p "$TARGET_DIR/.gemini"
-  cp -rn "$TEMPLATE_DIR/django/.gemini/"* "$TARGET_DIR/.gemini/" 2>/dev/null || true
-  success ".gemini 설치 완료"
+# 레거시 정리: Gemini Code Assist 잔재 제거.
+# 1.2.0 이전 설치는 .gemini/ 와 gemini-review.md 를 남긴다. cp -rn/-n 은 새 파일만
+# 추가하고 낡은 파일을 지우지 않으므로, 재실행만으로는 이 잔재가 사라지지 않는다
+# (그러면 "재실행하면 자동으로 따라온다"는 이 하네스의 원칙이 깨진다). 우리가 심은
+# 파일임을 증명하는 지문(우리 문구)이 있을 때만 지운다 — 사용자가 같은 이름으로
+# 직접 만든 설정까지 건드리면 안 된다.
+if [ -f "$TARGET_DIR/.gemini/styleguide.md" ] && \
+   grep -q '이 파일은 Gemini Code Assist 전용' "$TARGET_DIR/.gemini/styleguide.md" 2>/dev/null; then
+  # config.yaml 은 지우지 않는다 — 지문이 styleguide.md 에만 있어 config.yaml 자체가
+  # 사용자 수정본인지 독립적으로 확인할 방법이 없다. styleguide.md 만 지우면
+  # config.yaml 이 남아 .gemini/ 는 안 비워지지만(rmdir 스킵), 사용자 설정을
+  # 지울 위험보다 그쪽이 훨씬 싸다.
+  rm -f "$TARGET_DIR/.gemini/styleguide.md"
+  rmdir "$TARGET_DIR/.gemini" 2>/dev/null || true
+  warn ".gemini/styleguide.md 제거 완료 (Gemini Code Assist → CodeRabbit 대체, harness-init 1.2.0)"
+  if [ -f "$TARGET_DIR/.gemini/config.yaml" ]; then
+    warn "  .gemini/config.yaml 은 지문이 없어 남겨뒀습니다 — 더 이상 필요 없다면 직접 지우세요."
+  fi
 fi
+if [ -f "$TARGET_DIR/.claude/commands/workflows/gemini-review.md" ] && \
+   grep -q 'Gemini Code Assist reviews' "$TARGET_DIR/.claude/commands/workflows/gemini-review.md" 2>/dev/null; then
+  rm -f "$TARGET_DIR/.claude/commands/workflows/gemini-review.md"
+  warn "/workflows:gemini-review 제거 완료 (→ /workflows:coderabbit-review)"
+fi
+
+# .coderabbit.yaml 복사 (Gemini Code Assist 대체 — 개인 사용자 무료 제공 종료로 폐지)
+# 사용자 소유 설정이라 -n 으로 보존한다 (gates.json 과 같은 이유).
+cp -n "$TEMPLATE_DIR/django/.coderabbit.yaml" "$TARGET_DIR/.coderabbit.yaml" 2>/dev/null || true
+success ".coderabbit.yaml 설치 완료"
 
 # .github 복사
 if [ -d "$TEMPLATE_DIR/django/.github" ]; then
@@ -423,23 +446,27 @@ if IS_JS_ENV; then
 fi
 
 # ── .gitignore 업데이트 ────────────────────────────────
+# base-project 의 범용 항목(harness·AI 도구·IDE·macOS·codegraph 등)에 스택별
+# 델타만 얹는다. 예전엔 django/js 템플릿이 같은 범용 블록을 각각 통째로 들고
+# 있어 손으로 두 번 고쳐야 했고, 실제로 js 판에만 `.codegraph/`·
+# `.claude/scripts/__pycache__/` 가 빠진 채로 낡아 있었다.
 GITIGNORE="$TARGET_DIR/.gitignore"
+BASE_APPEND_FILE="$TEMPLATE_DIR/base-project/.gitignore.append"
 if IS_JS_ENV && [ -f "$TEMPLATE_DIR/js/.gitignore.append" ]; then
-  APPEND_FILE="$TEMPLATE_DIR/js/.gitignore.append"
+  STACK_APPEND_FILE="$TEMPLATE_DIR/js/.gitignore.append"
 else
-  APPEND_FILE="$TEMPLATE_DIR/django/.gitignore.append"
+  STACK_APPEND_FILE="$TEMPLATE_DIR/django/.gitignore.append"
 fi
 
 if [ -f "$GITIGNORE" ]; then
   if ! grep -q ".claude/local/" "$GITIGNORE"; then
-    echo "" >> "$GITIGNORE"
-    cat "$APPEND_FILE" >> "$GITIGNORE"
+    { echo ""; cat "$BASE_APPEND_FILE"; echo ""; cat "$STACK_APPEND_FILE"; } >> "$GITIGNORE"
     success ".gitignore 업데이트 완료"
   else
     warn ".gitignore 이미 설정됨, 건너뜀"
   fi
 else
-  cp "$APPEND_FILE" "$GITIGNORE"
+  { cat "$BASE_APPEND_FILE"; echo ""; cat "$STACK_APPEND_FILE"; } > "$GITIGNORE"
   success ".gitignore 생성 완료"
 fi
 
@@ -672,9 +699,25 @@ if IS_JS_ENV; then
   fi
 
   # CLAUDE.md 오버라이드 (Django 아키텍처 규칙 → JS/TS 아키텍처 규칙)
+  #
+  # merge-claude-md.sh 가 방금 마커 앞에 보존한 기존 프로젝트 내용을 여기서 통째로
+  # cp -f 하면 그대로 날아간다 (harness-init 1.1.0 실측 버그 — 기존 CLAUDE.md 가
+  # {project_name} 플레이스홀더투성이 템플릿으로 완전히 교체됐다). 마커 이전 구간
+  # (=사용자 소유 내용)만 보존하고 마커 이후(=harness 소유 구간)만 JS 판으로 교체한다.
   if [ -f "$TEMPLATE_DIR/js/CLAUDE.md" ]; then
-    cp -f "$TEMPLATE_DIR/js/CLAUDE.md" "$TARGET_DIR/CLAUDE.md"
-    success "JS CLAUDE.md 적용 완료"
+    _CLAUDE_MARKER='<!-- harness-init: DO NOT REMOVE -->'
+    if [ -f "$TARGET_DIR/CLAUDE.md" ] && grep -qF "$_CLAUDE_MARKER" "$TARGET_DIR/CLAUDE.md"; then
+      _user_prefix=$(awk -v marker="$_CLAUDE_MARKER" 'index($0, marker) { exit } { print }' "$TARGET_DIR/CLAUDE.md")
+      if [ -n "$_user_prefix" ]; then
+        { printf '%s\n' "$_user_prefix"; cat "$TEMPLATE_DIR/js/CLAUDE.md"; } > "$TARGET_DIR/CLAUDE.md.harness-tmp"
+      else
+        cp "$TEMPLATE_DIR/js/CLAUDE.md" "$TARGET_DIR/CLAUDE.md.harness-tmp"
+      fi
+      mv "$TARGET_DIR/CLAUDE.md.harness-tmp" "$TARGET_DIR/CLAUDE.md"
+    else
+      cp -f "$TEMPLATE_DIR/js/CLAUDE.md" "$TARGET_DIR/CLAUDE.md"
+    fi
+    success "JS CLAUDE.md 적용 완료 (기존 프로젝트 내용 보존)"
   fi
 
   # pyproject.toml 제거 (Python 전용 — JS 프로젝트에 불필요)
@@ -698,11 +741,14 @@ if IS_JS_ENV; then
     success "JS pre-bash-guard.sh 적용 완료"
   fi
 
-  # .gemini/styleguide.md 오버라이드 (Django → TypeScript/JS)
-  if [ -f "$TEMPLATE_DIR/js/.gemini/styleguide.md" ]; then
-    mkdir -p "$TARGET_DIR/.gemini"
-    cp -f "$TEMPLATE_DIR/js/.gemini/styleguide.md" "$TARGET_DIR/.gemini/styleguide.md"
-    success "JS Gemini 스타일 가이드 적용 완료"
+  # .coderabbit.yaml 오버라이드 (Django path_instructions → JS/TS path_instructions)
+  # gates.json 과 같은 규칙: 사용자가 손대지 않은(=django 판 그대로인) 경우에만 교체한다.
+  if [ -f "$TEMPLATE_DIR/js/.coderabbit.yaml" ]; then
+    if [ ! -f "$TARGET_DIR/.coderabbit.yaml" ] || \
+       grep -q 'path: "\*\*/\*\.py"' "$TARGET_DIR/.coderabbit.yaml" 2>/dev/null; then
+      cp -f "$TEMPLATE_DIR/js/.coderabbit.yaml" "$TARGET_DIR/.coderabbit.yaml"
+      success ".coderabbit.yaml JS 버전으로 교체"
+    fi
   fi
 
   # docs/DOC-SYNC-POLICY.md 오버라이드 (views.py → controller.ts 매핑)
@@ -805,12 +851,12 @@ echo "  ├── .claude/tasks/"
 echo "  ├── .claude/decisions/"
 echo "  ├── .claude/skills/          (explore/implement/debug/review/autopilot + orchestrator)"
 echo "  ├── .claude/agents/          (analyst/architect/coder/tester/reviewer)"
-echo "  ├── .claude/commands/        (/review, /workflows:gemini-review 슬래시 커맨드)"
+echo "  ├── .claude/commands/        (/review, /workflows:coderabbit-review 슬래시 커맨드)"
 echo "  ├── .claude/hooks/           (session-knowledge — SessionStart / pre-bash-guard — PreToolUse / domain-guard, insight-collector, notification)"
 echo "  ├── .claude/scripts/         (domain-extract / domain-gate / domain-freshness — 의미 지식 도구)"
 echo "  ├── .claude/rules/           (knowledge / architecture / testing / domain / agents / hooks — CLAUDE.md @imports)"
 echo "  ├── .claude/settings.json"
-echo "  ├── .gemini/                 (Gemini Code Assist 설정)"
+echo "  ├── .coderabbit.yaml         (CodeRabbit 리뷰 설정 — GitHub App 설치 필요)"
 echo "  ├── .github/                 (이슈 템플릿, PR 템플릿, 워크플로우)"
 echo "  ├── docs/DOC-SYNC-POLICY.md  (문서 동기화 정책)"
   if IS_JS_ENV; then
@@ -859,6 +905,10 @@ echo ""
 echo "  ANTHROPIC_API_KEY 없이는:"
 echo "  · PR 자동 코드 리뷰 불가 (claude-code-review)"
 echo "  · 이슈 자동 처리 불가 (claude)"
+echo ""
+echo "  .coderabbit.yaml 은 설정 파일일 뿐 그 자체로는 아무것도 하지 않습니다."
+echo "  https://github.com/marketplace/coderabbitai 에서 GitHub App 을 이 레포에"
+echo "  설치해야 PR 리뷰가 실제로 돕니다 (Secrets 불필요, App 설치만 하면 됨)."
 echo ""
 echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""

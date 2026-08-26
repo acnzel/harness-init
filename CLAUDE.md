@@ -68,7 +68,7 @@ harness-init/
    gates.json·AGENTS.md·settings.json. 소유권에 따라 `-n` 과 `-f` 가 갈린다 (아래 멱등성 절)
 7. **게이트 자가진단 주입** — settings.json 멱등 병합. 기존 설치의 죽은 인라인 훅도 교체
 8. **LSP 설정 주입** — 언어별 LSP. 이어서 Atlassian MCP 설정과
-   `.gemini`·`.github`·`docs`·`DOMAIN.md` 복사가 같은 구간에 있다
+   `.coderabbit.yaml`·`.github`·`docs`·`DOMAIN.md` 복사가 같은 구간에 있다
 9. **.gitignore 업데이트** — 스택별 `.gitignore.append` 를 추가 (이미 있으면 건너뜀)
 10. **pre-commit 설정** — Python: ruff / JS·TS: prettier + eslint. lint baseline 포함
 11. **비 Django 스택이면 harness 마이그레이션** — `migration.sh` 가 템플릿 문구를 스택에 맞게 치환

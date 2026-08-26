@@ -82,7 +82,8 @@ bash ~/harness-init/init.sh
 
 1. **환경 선택** — Python / JS·TS / 자동 감지 중 선택해 스택별 설정 분기
 2. **스택 감지** — `manage.py` / `requirements.txt` / `package.json` 등으로 기술 스택 식별
-3. **하네스 설치** — Django/JS 템플릿 기반으로 `.claude/`, `.github/`, `.gemini/` 구성
+3. **하네스 설치** — Django/JS 템플릿 기반으로 `.claude/`, `.github/`, `.coderabbit.yaml` 구성
+   (스택을 감지하지 못하면 이 전체 설치 대신 `templates/base-project/` 최소 하네스만 깔린다 — 아래 "지원 환경" 참조)
 4. **pre-commit 설치** — Python: ruff, JS·TS: prettier + eslint (자동 설치·등록)
 5. **스택 마이그레이션** — 비 Django 스택이면 `migration.sh`가 내용을 해당 스택으로 자동 변환
 6. **구조 지식 계층** — `codegraph-setup.sh`가 인덱싱 + MCP 등록 (`.mcp.json`). codegraph 미설치면 안내 후 건너뜀
@@ -122,7 +123,7 @@ my-project/
 │   │   ├── review.md                ← /review 슬래시 커맨드
 │   │   ├── learn.md                 ← /learn (insight → 스킬 저장)
 │   │   └── workflows/
-│   │       └── gemini-review.md     ← /workflows:gemini-review
+│   │       └── coderabbit-review.md ← /workflows:coderabbit-review
 │   ├── hooks/
 │   │   ├── _hook-input.sh             ← ★ 훅 페이로드 파싱 공용 헬퍼 (source 전용)
 │   │   ├── gate-selftest.sh           ← ★ 게이트가 살아있는지 실측 (SessionStart)
@@ -151,7 +152,7 @@ my-project/
 │   │   └── adr-template.md
 │   ├── gates.json                     ← ★ 게이트 선언 (pre-push·CI 공용, 프로젝트 소유)
 │   └── settings.json
-├── .gemini/                          ← Gemini Code Assist 설정
+├── .coderabbit.yaml                  ← CodeRabbit 리뷰 설정 (GitHub App 설치 필요)
 ├── .github/
 │   ├── ISSUE_TEMPLATE/
 │   ├── CODEOWNERS                 ← ★ 리뷰어 자동 할당 (전부 주석, 채워서 켤 것)
@@ -281,7 +282,7 @@ GitHub 이 오류를 표시하므로, 팀 핸들을 채운 뒤 `#` 을 지워 �
 | `AGENTS.md` | 모든 에이전트 (Claude·Codex·Cursor·OpenCode) | 작업 원칙, 절대 규칙, 권한·경계 |
 | `CLAUDE.md` | Claude Code | 환경 설정, `@import`, 인사이트 규칙 |
 | `.claude/rules/*.md` | 정본을 참조하는 모두 | 아키텍처·테스트·도메인·훅 상세 |
-| `.gemini/styleguide.md` | Gemini Code Assist | 리뷰 기준 (파생본) |
+| `.coderabbit.yaml` | CodeRabbit | 리뷰 기준. `knowledge_base.code_guidelines.filePatterns` 로 `.claude/rules/*` 를 참조(파생본 아님) |
 
 `CLAUDE.md` 는 작업 원칙을 다시 적지 않고 `AGENTS.md` 를 가리킵니다.
 
@@ -312,12 +313,18 @@ python3 .claude/scripts/render-agents.py --repo . --check    # 낡았으면 exit
 Codex·Cursor 는 그 파일을 읽지 않으므로 `AGENTS.md` 에 글로도 있어야 전달됩니다. 중복이
 아니라 다른 청중을 위한 유일한 경로라서, 손으로 옮겨 적는 대신 같은 원본에서 생성합니다.
 
-### 남아 있는 중복
+### CodeRabbit 참조 (더 이상 중복 아님)
 
-`.gemini/styleguide.md` 는 `.claude/rules/` 의 레이어·테스트 규칙을 다시 씁니다. Gemini
-Code Assist 는 이 파일의 내용만 프롬프트로 받고 파일 참조를 따라가지 못해서, 참조로
-대체하면 리뷰 품질이 떨어집니다. 없앨 수 없는 중복이므로 파일 상단에 정본 관계를 명시하고
-**같은 커밋에서 함께 고칠 것**을 요구합니다.
+`.coderabbit.yaml` 은 예전에 `path_instructions` 에 `.claude/rules/architecture.md`·
+`testing.md` 의 레이어·테스트 규칙을 통째로 옮겨 적었습니다(PR #30, CodeRabbit 리뷰가
+직접 지적). CodeRabbit 은 `CLAUDE.md`·`AGENTS.md` 는 자동으로 인식하지만
+[`.claude/rules/*` 는 그 자동 인식 목록에 없어서](https://docs.coderabbit.ai/knowledge-base/code-guidelines)
+`knowledge_base.code_guidelines.filePatterns` 로 명시적으로 참조를 걸어 둡니다 — 옮겨
+적지 않고 가리키기만 하므로 규칙 문서를 고쳐도 이 파일은 따로 손댈 필요가 없습니다.
+
+`path_instructions` 에는 저 두 문서에 없는, CodeRabbit 리뷰 전용 지침(KISS/YAGNI/DRY
+억제 기준, 리뷰 코멘트 레벨 등)만 남아 있습니다. 이건 중복이 아니라 "금지 명령"과
+같은 이유입니다 — CodeRabbit 만 필요로 하는 내용이라 다른 문서로 옮길 대상이 없습니다.
 
 ---
 
@@ -768,8 +775,8 @@ cp .claude/decisions/adr-template.md .claude/decisions/001-auth-strategy.md
 | Django / FastAPI / Flask | `templates/django/` | pytest + Factory + PropertyMock | ruff + ruff-format + domain-gate | stdlib `ast` (정밀) |
 | Next.js / NestJS / Express | `templates/js/` | jest/vitest + factory functions + jest.spyOn | prettier + eslint + domain-gate | 선언 블록 지문 (TS enum / `as const` / 리터럴 union / Prisma) |
 
-JS/TS 환경은 Django 공통 파일(skills, commands, hooks, .gemini, docs)을 그대로 재사용하고,
-에이전트·rules·CLAUDE.md·DOMAIN.md·pre-commit·워크플로우(`pr-test.yml`, `post-merge-docs.yml`)만
+JS/TS 환경은 Django 공통 파일(skills, commands, hooks, docs)을 그대로 재사용하고,
+에이전트·rules·CLAUDE.md·DOMAIN.md·.coderabbit.yaml·pre-commit·워크플로우(`pr-test.yml`, `post-merge-docs.yml`)만
 JS 전용으로 교체됩니다. (`pre-bash-guard.sh` 만 Django migrate 경고를 뺀 JS 버전으로 바뀝니다.)
 
 스택을 감지하지 못하면 위 두 계층 대신 `templates/base-project/` 의 최소 하네스만 깔고
@@ -803,12 +810,13 @@ harness-init/
 │   │   │   ├── hooks/            ← session-knowledge / pre-bash-guard / domain-guard / insight-collector / notification
 │   │   │   ├── rules/            ← knowledge / architecture / testing / domain / agents / hooks (CLAUDE.md @imports)
 │   │   │   └── decisions/
-│   │   ├── .gemini/
+│   │   ├── .coderabbit.yaml
 │   │   ├── .github/
 │   │   └── docs/
 │   └── js/                       ← JS/TS 전용 오버라이드 템플릿
 │       ├── CLAUDE.md             ← Controller/Service/Repository + TypeScript 규칙
 │       ├── DOMAIN.md             ← JS ORM 스키마 안내 (Prisma/TypeORM/Mongoose/Drizzle)
+│       ├── .coderabbit.yaml      ← path_instructions 를 JS/TS 규칙으로 교체 (django 판 그대로면)
 │       ├── .claude/
 │       │   ├── agents/           ← analyst/architect/coder/tester/reviewer (jest 기반)
 │       │   ├── rules/            ← architecture / testing / domain / agents / hooks (JS/TS 전용)

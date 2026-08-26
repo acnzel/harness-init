@@ -21,10 +21,11 @@ if [ -f "$TARGET_FILE" ]; then
   } >> "$TARGET_FILE"
   echo -e "\033[0;32m[harness]\033[0m ✓ CLAUDE.md 업데이트 완료"
 else
-  # 마커는 템플릿 첫 줄에 들어 있다. 여기서 따로 찍지 않는 이유는 init.sh 가
-  # JS 스택에서 이 파일을 js/CLAUDE.md 로 통째로 덮어쓰기 때문이다. 마커가
-  # 템플릿에 있어야 그 경로에서도 살아남고, 재실행 시 "harness 설정 없음"으로
-  # 판정해 템플릿을 한 번 더 덧붙이는 일이 없다.
+  # 마커는 템플릿 첫 줄에 들어 있다. init.sh 는 JS 스택에서 이 파일을 다시 한 번
+  # 건드리지만(js/CLAUDE.md 로 교체), 마커 이전 구간만 보존하고 이후만 바꾸므로
+  # 지금 막 생성한 이 파일(내용 전체가 마커 이후)은 그대로 교체 대상이 된다.
+  # 마커가 템플릿에 있어야 재실행 시에도 "harness 설정 없음"으로 오판해 템플릿을
+  # 한 번 더 덧붙이는 일이 없다.
   cp "$TEMPLATE_FILE" "$TARGET_FILE"
   echo -e "\033[0;32m[harness]\033[0m ✓ CLAUDE.md 생성 완료"
 fi

@@ -96,6 +96,12 @@ if IS_UNKNOWN_ENV; then
     success ".gitignore 생성 완료 (base-project)"
   fi
 
+  # 최소 하네스도 정식 설치다. 여기에 버전이 안 남으면 "이 레포에 무엇이 깔렸나"를
+  # 물었을 때 답이 없다.
+  if [ -f "$SCRIPT_DIR/VERSION" ]; then
+    printf '%s\n' "$(cat "$SCRIPT_DIR/VERSION")" > "$TARGET_DIR/.claude/harness-version"
+  fi
+
   success "최소 하네스 설치 완료"
   echo ""
   echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"

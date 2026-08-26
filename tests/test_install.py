@@ -72,6 +72,12 @@ class DjangoInstallTests(HarnessTestCase):
             agents[start:end].strip().count("\n") > 0, "자동 구간이 비어 있다"
         )
 
+    def test_version_is_stamped(self):
+        # 재실행으로 갱신되는 도구라, 대상 레포에서 어느 판이 깔렸는지 알아야
+        # 버그를 고쳤을 때 그 레포가 따라왔는지 확인할 수 있다.
+        stamped = self.read(".claude/harness-version").strip()
+        self.assertEqual(stamped, (ROOT / "VERSION").read_text(encoding="utf-8").strip())
+
     def test_pyproject_is_present_for_python(self):
         self.assertInstalled("pyproject.toml")
 
@@ -116,6 +122,11 @@ class UnknownStackInstallTests(HarnessTestCase):
             self.assertInstalled(name)
         for name in ("notification.sh", "insight-collector.sh"):
             self.assertInstalled(f".claude/hooks/{name}")
+
+    def test_version_is_stamped_on_the_minimal_path_too(self):
+        # 최소 하네스도 정식 설치다. 여기만 버전이 없으면 "무엇이 깔렸나"에 답이 없다.
+        stamped = self.read(".claude/harness-version").strip()
+        self.assertEqual(stamped, (ROOT / "VERSION").read_text(encoding="utf-8").strip())
 
     def test_full_harness_is_skipped(self):
         # SKIP_FULL_INSTALL 가드가 풀리면 스택을 모르는 레포에 Django 하네스가 깔린다.

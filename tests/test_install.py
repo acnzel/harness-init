@@ -197,6 +197,17 @@ class SelfCiTests(unittest.TestCase):
     def test_workflow_checks_shell_syntax(self):
         self.assertIn("bash -n", self.workflow.read_text(encoding="utf-8"))
 
+    def test_yaml_step_declares_its_dependency(self):
+        """PyYAML 은 표준 라이브러리가 아니고 러너에도 없다.
+
+        이 사실은 gates.json 이 YAML 대신 JSON 을 쓰는 이유로 레포에 이미 적혀
+        있는데, CI 를 쓰면서 그대로 밟았다. 검사 단계와 설치 단계가 짝이 아니면
+        같은 실패가 반복된다.
+        """
+        body = self.workflow.read_text(encoding="utf-8")
+        if "import yaml" in body or "yaml.safe_load" in body:
+            self.assertIn("pip install --quiet pyyaml", body, "yaml 을 쓰면서 설치하지 않는다")
+
     def test_workflow_installs_no_optional_dependency(self):
         """CI 에 pre-commit·ruff 를 깔면 '깨끗한 기계에서 도는가'를 못 보게 된다.
 

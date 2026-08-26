@@ -89,14 +89,24 @@ def summarize(events):
     timeline = defaultdict(list)
 
     for event in events:
+        if not isinstance(event, dict):
+            continue
         kind = event.get("event", "")
         stamp = event.get("ts", "")[:10]
         if kind == "gate_run":
+            detail = event.get("detail", "{}")
+            if not isinstance(detail, str):
+                continue
             try:
-                payload = json.loads(event.get("detail", "{}"))
+                payload = json.loads(detail)
             except ValueError:
                 continue
-            for name in payload.get("fail", []):
+            if not isinstance(payload, dict):
+                continue
+            fail = payload.get("fail", [])
+            if not isinstance(fail, list):
+                continue
+            for name in fail:
                 failed_gates[name] += 1
                 timeline[f"gate_failed::{name}"].append(stamp)
             continue
@@ -230,12 +240,17 @@ def main(argv=None):
             "counts": {kind: dict(bucket) for kind, bucket in counts.items()},
             "failed_gates": dict(failed_gates),
             "candidates": sorted(
-                (
+                [
                     {"kind": kind, "name": name, "count": count}
                     for kind, bucket in counts.items()
                     for name, count in bucket.items()
                     if count >= threshold
-                ),
+                ]
+                + [
+                    {"kind": "gate_run", "name": name, "count": count}
+                    for name, count in failed_gates.items()
+                    if count >= threshold
+                ],
                 key=lambda row: -row["count"],
             ),
         }

@@ -29,10 +29,13 @@ if [ "$STATUS" -eq 1 ]; then
   echo "$OUTPUT" >&2
   # 차단을 기록한다. 무엇이 몇 번 막았는지를 알아야 과차단하는 게이트를 찾는다.
   # 계측은 차단을 지연시키지 않는다 — 실패해도 || true 로 흘린다.
+  # 바이트 단위로 자르지 않는다. head -c 는 멀티바이트 문자(한글) 중간을 끊어
+  # 깨진 UTF-8 을 만들고, hook-io.py 가 그걸 디코딩하다 죽어 기록이 통째로
+  # 유실된다 (record_event 의 [:DETAIL_LIMIT] 이 코드포인트 단위로 이미 자른다).
   HOOKIO="$PROJECT_DIR/.claude/scripts/hook-io.py"
   [ -f "$HOOKIO" ] && python3 "$HOOKIO" event \
     --event gate_blocked --source domain-guard.sh \
-    --detail "domain-gate |$(printf '%s' "$OUTPUT" | head -c 200)" \
+    --detail "domain-gate |$OUTPUT" \
     --repo "$PROJECT_DIR" >/dev/null 2>&1 || true
   exit 2
 fi

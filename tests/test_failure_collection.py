@@ -39,6 +39,17 @@ def hook_payload(command):
     )
 
 
+def edit_payload(file_path):
+    return json.dumps(
+        {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Edit",
+            "tool_input": {"file_path": str(file_path)},
+            "session_id": "test",
+        }
+    )
+
+
 class InstalledFixture(unittest.TestCase):
     """설치가 끝난 픽스처 하나를 공유한다. 설치는 느리고 판정은 빠르다."""
 
@@ -127,7 +138,6 @@ class BypassDetectionTests(InstalledFixture):
         self.assertNotIn("AKIAIOSFODNN7EXAMPLE", recorded, "시크릿이 기록에 남았다")
 
 
-
 class JsBypassDetectionTests(InstalledFixture):
     """JS 스택에서도 같은 판정이 돌아야 한다.
 
@@ -144,16 +154,22 @@ class JsBypassDetectionTests(InstalledFixture):
         self.assertTrue((self.path / ".claude/hooks/_hook-input.sh").is_file())
 
     def test_positive_commit_bypass_is_recorded(self):
-        self.assertIn("우회 기록됨", self.run_guard(f"git commit {NO_VERIFY} -m x").stdout)
+        self.assertIn(
+            "우회 기록됨", self.run_guard(f"git commit {NO_VERIFY} -m x").stdout
+        )
 
     def test_positive_precommit_skip_is_recorded(self):
-        self.assertIn("우회 기록됨", self.run_guard("SKIP=eslint git commit -m x").stdout)
+        self.assertIn(
+            "우회 기록됨", self.run_guard("SKIP=eslint git commit -m x").stdout
+        )
 
     def test_negative_ordinary_commit_does_not_fire(self):
         self.assertNotIn("우회 기록됨", self.run_guard("git commit -m x").stdout)
 
     def test_negative_npm_dry_run_does_not_fire(self):
-        self.assertNotIn("우회 기록됨", self.run_guard("npm publish --dry-run -n").stdout)
+        self.assertNotIn(
+            "우회 기록됨", self.run_guard("npm publish --dry-run -n").stdout
+        )
 
     def test_bypass_is_never_blocked(self):
         self.assertEqual(self.run_guard(f"git push {NO_VERIFY}").returncode, 0)
@@ -168,12 +184,16 @@ class SharedDetectionTests(unittest.TestCase):
         for template in ("django", "js"):
             guard = ROOT / f"templates/{template}/.claude/hooks/pre-bash-guard.sh"
             body = guard.read_text(encoding="utf-8")
-            self.assertIn("hook_report_bypass", body, f"{template} 이 공용 판정을 부르지 않는다")
+            self.assertIn(
+                "hook_report_bypass", body, f"{template} 이 공용 판정을 부르지 않는다"
+            )
             # 훅이 자체 판정을 다시 들이면 두 판정이 갈라진다.
             self.assertNotIn(
-                "no-verify", strip_comments(body),
+                "no-verify",
+                strip_comments(body),
                 f"{template} pre-bash-guard 에 자체 우회 판정이 남아 있다",
             )
+
 
 class InstrumentationIsFailOpenTests(InstalledFixture):
     """계측이 죽어도 게이트는 통과해야 한다."""
@@ -228,7 +248,8 @@ class DeclaredContractTests(unittest.TestCase):
         ]
         for name in declared:
             self.assertIn(
-                "표면화 대상", (ROOT / name).read_text(encoding="utf-8"),
+                "표면화 대상",
+                (ROOT / name).read_text(encoding="utf-8"),
                 f"{name} 의 우회 표면화 선언이 사라졌다",
             )
 
@@ -239,7 +260,10 @@ class FailureReportTests(InstalledFixture):
     def report(self, *extra):
         return subprocess.run(
             ["python3", ".claude/scripts/failure-report.py", ".", *extra],
-            cwd=str(self.path), capture_output=True, text=True, check=False,
+            cwd=str(self.path),
+            capture_output=True,
+            text=True,
+            check=False,
             env={"PATH": "/usr/bin:/bin", "NO_COLOR": "1", "HOME": str(self.path)},
         )
 
@@ -296,12 +320,17 @@ class FailureReportTests(InstalledFixture):
             empty = make_fixture(Path(tmp) / "fx", "django")
             (empty / ".claude/scripts").mkdir(parents=True, exist_ok=True)
             import shutil
+
             shutil.copy(
-                ROOT / "scripts/failure-report.py", empty / ".claude/scripts/failure-report.py"
+                ROOT / "scripts/failure-report.py",
+                empty / ".claude/scripts/failure-report.py",
             )
             result = subprocess.run(
                 ["python3", ".claude/scripts/failure-report.py", "."],
-                cwd=str(empty), capture_output=True, text=True, check=False,
+                cwd=str(empty),
+                capture_output=True,
+                text=True,
+                check=False,
                 env={"PATH": "/usr/bin:/bin", "NO_COLOR": "1"},
             )
             self.assertIn("아직 관측되지 않음", result.stdout)
@@ -311,6 +340,60 @@ class FailureReportTests(InstalledFixture):
         log = next((self.path / ".claude/local").glob("events-*.jsonl"))
         log.write_text(log.read_text(encoding="utf-8") + "{깨진 줄\n", encoding="utf-8")
         self.assertEqual(self.report().returncode, 0)
+
+    def test_gate_blocked_by_domain_change_is_recorded(self):
+        # bypass_used 만 실제로 트리거해서 검증하고 gate_blocked 는 로그를 손으로
+        # 지어냈다면, domain-guard.sh 의 기록 호출을 지워도 이 스위트는 초록불이다.
+        #
+        # 경로는 resolve() 한다. macOS 에서 tempfile 이 만드는 /var/... 는
+        # /private/var/... 의 심볼릭 링크라, PROJECT_DIR($PWD, 이미 실경로)과
+        # 그대로 비교하면 os.path.relpath 가 어긋나 도메인 게이트가 조용히
+        # 통과 판정을 낸다.
+        models_path = self.path.resolve() / "sample_app" / "models.py"
+        models_path.parent.mkdir(parents=True, exist_ok=True)
+        models_path.write_text(
+            "from django.db import models\n\n"
+            "class Status(models.TextChoices):\n"
+            '    OPEN = "open", "모집중"\n',
+            encoding="utf-8",
+        )
+        subprocess.run(
+            ["git", "-C", str(self.path), "add", "-A"],
+            capture_output=True,
+            check=False,
+        )
+        subprocess.run(
+            ["git", "-C", str(self.path), "commit", "-qm", "baseline", NO_VERIFY],
+            capture_output=True,
+            check=False,
+        )
+
+        # 의미 변화: Choices 멤버 추가. DOMAIN.md 는 함께 갱신하지 않는다.
+        models_path.write_text(
+            "from django.db import models\n\n"
+            "class Status(models.TextChoices):\n"
+            '    OPEN = "open", "모집중"\n'
+            '    CLOSED = "closed", "마감"\n',
+            encoding="utf-8",
+        )
+
+        result = subprocess.run(
+            ["bash", ".claude/hooks/domain-guard.sh"],
+            cwd=str(self.path),
+            input=edit_payload(models_path),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertTrue(
+            any(
+                "domain-gate" in event.get("detail", "")
+                for event in self.events("gate_blocked")
+            ),
+            "domain-guard.sh 의 차단이 gate_blocked 로 기록되지 않았다",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

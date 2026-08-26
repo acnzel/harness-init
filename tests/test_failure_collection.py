@@ -21,7 +21,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from support import ROOT, make_fixture, run_init
+from support import ROOT, make_fixture, run_init, strip_comments
 
 # 플래그를 조립해서 만든다. 소스에 문자열 그대로 두면 사용자 전역 커밋 가드가
 # 이 파일을 실제 우회 시도로 오인한다 (실제로 그랬다).
@@ -42,11 +42,16 @@ def hook_payload(command):
 class InstalledFixture(unittest.TestCase):
     """설치가 끝난 픽스처 하나를 공유한다. 설치는 느리고 판정은 빠르다."""
 
+    stack = "django"
+    env_type = "python"
+
     @classmethod
     def setUpClass(cls):
+        if cls is InstalledFixture:
+            raise unittest.SkipTest("기반 클래스")
         cls._tmp = tempfile.TemporaryDirectory()
-        cls.path = make_fixture(Path(cls._tmp.name) / "fx", "django")
-        result = run_init(cls.path, env_type="python")
+        cls.path = make_fixture(Path(cls._tmp.name) / "fx", cls.stack)
+        result = run_init(cls.path, env_type=cls.env_type)
         assert result.returncode == 0, result.stderr[-2000:]
 
     @classmethod
@@ -122,6 +127,54 @@ class BypassDetectionTests(InstalledFixture):
         self.assertNotIn("AKIAIOSFODNN7EXAMPLE", recorded, "시크릿이 기록에 남았다")
 
 
+
+class JsBypassDetectionTests(InstalledFixture):
+    """JS 스택에서도 같은 판정이 돌아야 한다.
+
+    우회 감지를 django 판 pre-bash-guard.sh 에만 넣었다가 js 가 빠진 적이 있다.
+    그래서 판정을 _hook-input.sh 한 곳으로 옮기고, 양쪽 스택에서 같은 검사를 돌린다.
+    한쪽만 검사하면 같은 드리프트가 재발한다.
+    """
+
+    stack = "nextjs"
+    env_type = "js"
+
+    def test_shared_helper_is_installed_for_js(self):
+        # js 템플릿에는 _hook-input.sh 가 없다. django 판이 함께 깔려야 동작한다.
+        self.assertTrue((self.path / ".claude/hooks/_hook-input.sh").is_file())
+
+    def test_positive_commit_bypass_is_recorded(self):
+        self.assertIn("우회 기록됨", self.run_guard(f"git commit {NO_VERIFY} -m x").stdout)
+
+    def test_positive_precommit_skip_is_recorded(self):
+        self.assertIn("우회 기록됨", self.run_guard("SKIP=eslint git commit -m x").stdout)
+
+    def test_negative_ordinary_commit_does_not_fire(self):
+        self.assertNotIn("우회 기록됨", self.run_guard("git commit -m x").stdout)
+
+    def test_negative_npm_dry_run_does_not_fire(self):
+        self.assertNotIn("우회 기록됨", self.run_guard("npm publish --dry-run -n").stdout)
+
+    def test_bypass_is_never_blocked(self):
+        self.assertEqual(self.run_guard(f"git push {NO_VERIFY}").returncode, 0)
+
+
+class SharedDetectionTests(unittest.TestCase):
+    """판정이 한 곳에만 있어야 한다."""
+
+    def test_detection_lives_only_in_the_shared_helper(self):
+        helper = ROOT / "templates/django/.claude/hooks/_hook-input.sh"
+        self.assertIn("hook_report_bypass", helper.read_text(encoding="utf-8"))
+        for template in ("django", "js"):
+            guard = ROOT / f"templates/{template}/.claude/hooks/pre-bash-guard.sh"
+            body = guard.read_text(encoding="utf-8")
+            self.assertIn("hook_report_bypass", body, f"{template} 이 공용 판정을 부르지 않는다")
+            # 훅이 자체 판정을 다시 들이면 두 판정이 갈라진다.
+            self.assertNotIn(
+                "no-verify", strip_comments(body),
+                f"{template} pre-bash-guard 에 자체 우회 판정이 남아 있다",
+            )
+
 class InstrumentationIsFailOpenTests(InstalledFixture):
     """계측이 죽어도 게이트는 통과해야 한다."""
 
@@ -158,10 +211,26 @@ class DeclaredContractTests(unittest.TestCase):
         # 구현이 없던 상태가 정확히 이 기능이 메우려는 구멍이다.
         renderer = (ROOT / "scripts/render-agents.py").read_text(encoding="utf-8")
         self.assertIn("표면화 대상", renderer)
-        guard = (ROOT / "templates/django/.claude/hooks/pre-bash-guard.sh").read_text(
+        # 구현은 공용 헬퍼에 있다. 훅은 그것을 부르기만 한다.
+        helper = (ROOT / "templates/django/.claude/hooks/_hook-input.sh").read_text(
             encoding="utf-8"
         )
-        self.assertIn("bypass_used", guard, "선언은 있는데 기록 구현이 없다")
+        self.assertIn("bypass_used", helper, "선언은 있는데 기록 구현이 없다")
+
+    def test_declaration_exists_in_every_place_it_is_stated(self):
+        """선언은 다섯 곳에 있다. 어느 하나가 사라져도 나머지가 거짓이 되지 않게 한다."""
+        declared = [
+            "scripts/render-agents.py",
+            "scripts/domain-gate.py",
+            "templates/django/.claude/rules/knowledge.md",
+            "templates/js/.claude/rules/knowledge.md",
+            "templates/js/CLAUDE.md",
+        ]
+        for name in declared:
+            self.assertIn(
+                "표면화 대상", (ROOT / name).read_text(encoding="utf-8"),
+                f"{name} 의 우회 표면화 선언이 사라졌다",
+            )
 
 
 class FailureReportTests(InstalledFixture):

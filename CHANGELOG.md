@@ -37,6 +37,10 @@ harness-init 은 남의 레포에 주입되고 재실행으로 갱신된다. 그
 `gate-runner.py` 는 이미 `gate_run` 에 실패 게이트 목록을 담고 있어 코드 변경이
 없다. 보고서가 그 데이터를 함께 읽는다.
 
+우회 판정은 `_hook-input.sh` 의 `hook_report_bypass` 한 곳에 있고 django·js
+`pre-bash-guard.sh` 가 함께 부른다. 처음에는 django 판에만 넣어 js 가 빠졌는데,
+그게 정확히 이 레포가 파싱을 한 곳에 모은 이유와 같은 실패라 판정도 옮겼다.
+
 ---
 
 ## 1.0.0

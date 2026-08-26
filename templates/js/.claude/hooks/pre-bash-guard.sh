@@ -20,6 +20,10 @@ hook_input_load || exit 0
 CMD="$HOOK_COMMAND"
 [ -n "$CMD" ] || exit 0
 
+# 게이트 우회 감지. 판정은 _hook-input.sh 한 곳에 있다 (django 템플릿에서
+# 함께 설치되며 양쪽 훅이 공유한다). 여기서 따로 판정하면 한쪽만 낡는다.
+hook_report_bypass "$CMD"
+
 FIRED=""
 
 # DROP TABLE / TRUNCATE TABLE 경고

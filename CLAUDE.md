@@ -149,6 +149,10 @@ django 판이 깔린 채 조용히 오작동한다 (`post-merge-docs.yml` 이 �
 
 - 파싱은 `_hook-input.sh` 의 `hook_input_load` 에만 둔다. 훅에서 직접 JSON 을 까지 말 것 —
   훅마다 각자 파싱하면 같은 불일치가 재발한다.
+- **여러 스택이 공유하는 판정도 같은 자리에 둔다.** django·js 가 각각 `pre-bash-guard.sh`
+  를 갖고 있어서, 한쪽에만 넣으면 다른 쪽이 조용히 낡는다. 우회 감지를 django 판에만
+  넣었다가 js 가 빠진 적이 있다 (`hook_report_bypass` 가 그래서 `_hook-input.sh` 에 있다).
+  `_hook-input.sh` 는 django 템플릿에서 한 번만 설치되어 양쪽이 함께 쓴다.
 - `settings.json` 에 **인라인 셸 훅을 넣지 말 것**. JSON 이스케이프 안에서는 stdin 파싱이
   불가능해 필연적으로 환경변수를 읽게 된다. 파일 훅으로 만들고 경로만 등록한다.
 - 새 게이트를 추가하면 `gate-selftest.sh` 에 **positive/negative 쌍**을 함께 추가한다.

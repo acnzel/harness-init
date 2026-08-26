@@ -65,32 +65,8 @@ if echo "$CMD" | grep -q "python manage.py test" && ! echo "$CMD" | grep -q "pyt
   echo ""
 fi
 
-# ── 게이트 우회 감지 ───────────────────────────────────
-# 우회는 금지가 아니라 **표면화 대상**이다 (AGENTS.md 자동 구간에 그렇게 적혀 있다).
-# 그런데 표면화하는 코드가 없어서, 지금까지는 아무도 모르게 우회됐다.
-#
-# 우회 자체를 막지 않는다. 막으면 우회의 우회를 학습시킨다. 대신 남긴다.
-# 이 기록이 "어떤 게이트가 실제로 방해가 되는가"의 유일한 근거다. 과차단하는
-# 게이트를 찾아 고치려면 몇 번 우회됐는지를 알아야 한다.
-BYPASS=""
-case "$CMD" in
-	*--no-verify*|*" -n "*) case "$CMD" in *git\ commit*|*git\ push*) BYPASS="no-verify" ;; esac ;;
-esac
-case "$CMD" in
-	SKIP=*|*" SKIP="*) BYPASS="${BYPASS:+$BYPASS,}pre-commit-SKIP" ;;
-esac
-case "$CMD" in
-	*--no-gpg-sign*) : ;;  # 서명 생략은 게이트 우회가 아니다
-esac
-
-if [ -n "$BYPASS" ]; then
-	echo ""
-	echo "📝 게이트 우회 기록됨: $BYPASS"
-	echo "   막지는 않습니다. 다만 PR 설명에 사유를 남기세요."
-	echo "   누적 확인: python3 .claude/scripts/failure-report.py"
-	echo ""
-	hook_event bypass_used pre-bash-guard.sh "$BYPASS |$CMD" || true
-fi
+# 게이트 우회 감지. 판정은 _hook-input.sh 한 곳에 있다 (양쪽 훅이 공유).
+hook_report_bypass "$CMD"
 
 # 발화를 기록한다. 게이트의 침묵이 '안전'인지 '고장'인지는 기록이 있어야 구분된다.
 [ -n "$FIRED" ] && hook_event gate_fired pre-bash-guard.sh "$FIRED |$CMD"

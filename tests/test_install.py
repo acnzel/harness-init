@@ -63,6 +63,15 @@ class DjangoInstallTests(HarnessTestCase):
         self.assertIn("<!-- harness:auto:start -->", agents)
         self.assertIn("<!-- harness:auto:end -->", agents)
 
+    def test_agents_md_empty_rules_section_points_agents_at_claude_md(self):
+        # AGENTS.md 의 절대 규칙은 항상 빈 채로 깔린다(LLM 이 창작하면 안 되므로).
+        # 기존 프로젝트는 그 규칙이 CLAUDE.md 쪽에 이미 있을 수 있는데, Codex·Cursor
+        # 처럼 AGENTS.md 만 읽는 도구는 이 안내가 없으면 그 내용을 영영 못 본다.
+        agents = self.read("AGENTS.md")
+        self.assertIn(
+            "CLAUDE.md", agents.split("## 절대 규칙")[1].split("## 권한과 경계")[0]
+        )
+
     def test_agents_md_auto_section_rendered_from_gates(self):
         # 렌더가 안 돌면 마커 사이가 비어 문서가 설정을 반영하지 못한다.
         agents = self.read("AGENTS.md")
@@ -97,6 +106,14 @@ class JsInstallTests(HarnessTestCase):
 
     def test_install_succeeds(self):
         self.assertEqual(self.result.returncode, 0, self.result.stderr[-2000:])
+
+    def test_agents_md_empty_rules_section_points_agents_at_claude_md(self):
+        # AGENTS.md 는 JS 스택에서도 django 판을 그대로 재사용한다 — 오버라이드가
+        # 안 걸린 채 이 안내문이 남아 있는지는 별도로 확인해야 한다.
+        agents = self.read("AGENTS.md")
+        self.assertIn(
+            "CLAUDE.md", agents.split("## 절대 규칙")[1].split("## 권한과 경계")[0]
+        )
 
     def test_js_gates_replace_django_gates(self):
         gates = json.loads(self.read(".claude/gates.json"))

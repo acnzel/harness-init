@@ -44,6 +44,20 @@ kimsuhanmu 레포에 실제로 설치해 보고 발견한 세 가지 결함을 �
   (PR 자동 코드 리뷰 워크플로 `claude-code-review.yml` 은 Gemini 가 아니라
   `anthropics/claude-code-action` 기반이라 이번 변경과 무관하다.)
 
+### 추가
+
+- **AGENTS.md 의 빈 절대 규칙 섹션에 CLAUDE.md 로 가라는 안내문.** `AGENTS.md`
+  는 설치 시 항상 절대 규칙이 비어 있다(LLM 이 채우면 창작이 되므로 의도적으로
+  비운다). 문제는 harness-init 을 **이미 CLAUDE.md 가 있던 프로젝트**에 설치하면,
+  그 프로젝트 고유 규칙이 CLAUDE.md 쪽(마커 이전, 사용자 소유 구간)에 이미 있을
+  수 있다는 점이다. `AGENTS.md` 는 Claude·Codex·Cursor 등 모든 에이전트가 읽는
+  공통 정본인데, Codex·Cursor 는 `CLAUDE.md` 를 읽지 않으므로 안내가 없으면 그
+  규칙을 영영 보지 못한다 — harness 설치 직후 Codex 로 그 레포를 열면 이미 있던
+  프로젝트 규칙을 완전히 무시한 채 작업하게 된다. 새 규칙을 대신 지어내는 대신,
+  "이 항목이 비어 있으면 CLAUDE.md 도 반드시 읽어라"는 내용-없는 안내문만
+  둔다 — 이건 창작이 아니라 참조라 안전하고, 사람이 실제 마이그레이션을 하기
+  전까지 첫 실행부터 즉시 효과가 있다.
+
 ---
 
 ## 1.1.0

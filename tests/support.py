@@ -32,10 +32,12 @@ INIT = ROOT / "init.sh"
 STACK_MARKERS = {
     "django": {"manage.py": "import os\n"},
     "nextjs": {"package.json": '{"name":"fx","dependencies":{"next":"14.0.0"}}\n'},
+    "nestjs": {
+        "package.json": '{"name":"fx","dependencies":{"@nestjs/core":"10.0.0"}}\n'
+    },
     "node": {"package.json": '{"name":"fx","version":"1.0.0"}\n'},
     "unknown": {},
 }
-
 
 
 def strip_comments(text):
@@ -46,6 +48,7 @@ def strip_comments(text):
     걷지 않으면 설명문을 위반으로 잡는다. 실제로 두 번 그랬다.
     """
     return re.sub(r"(?m)^\s*#.*$", "", text)
+
 
 def git(cwd, *arguments):
     return subprocess.run(

@@ -759,6 +759,66 @@ if IS_JS_ENV; then
   fi
 fi
 
+# ── Next.js App Router 전용 오버라이드 (JS 오버라이드 위에 다시 얹는다) ──
+# STACK=nextjs 는 nestjs/express/node 와 달리 별도 백엔드 서버가 없는 프론트엔드
+# 프로젝트일 확률이 높다. 위 JS 오버라이드가 심은 템플릿은 Controller/Service/
+# Repository(NestJS류 백엔드) 를 1순위로 가정하는데, App Router 프로젝트엔 Controller
+# 레이어 자체가 없다 — kimsuhanmu 레포 실측: Next.js 전용 프로젝트에 이 템플릿이
+# 깔려 존재하지 않는 레이어(.controller.ts)를 에이전트가 만들려는 문제가 있었다.
+# 그래서 nextjs 스택만 한 번 더 App Router 구조(Page/Route Handler/Server Action
+# → Service → Repository)로 덮는다. templates/nextjs/ 가 없으면 위 JS 판이 그대로
+# 남는다(하위 호환) — 각 단계가 파일 존재를 가드한다.
+if [ "$STACK" = "nextjs" ]; then
+  info "Next.js App Router 전용 파일 적용 중..."
+
+  # agents 오버라이드 (Controller/Service/Repository → Page/Route Handler/Server Action)
+  if [ -d "$TEMPLATE_DIR/nextjs/.claude/agents" ]; then
+    cp -rf "$TEMPLATE_DIR/nextjs/.claude/agents/"* "$TARGET_DIR/.claude/agents/" 2>/dev/null || true
+    success "Next.js agents 적용 완료"
+  fi
+
+  # rules 오버라이드 (architecture.md/testing.md/agents.md 만 App Router 판으로 교체 —
+  # knowledge.md/domain.md/hooks.md 는 스택 무관이라 js 판을 그대로 재사용한다)
+  if [ -d "$TEMPLATE_DIR/nextjs/.claude/rules" ]; then
+    cp -f "$TEMPLATE_DIR/nextjs/.claude/rules/"* "$TARGET_DIR/.claude/rules/" 2>/dev/null || true
+    success "Next.js rules 적용 완료"
+  fi
+
+  # CLAUDE.md 오버라이드 — JS 블록과 같은 마커 보존 로직 재사용 (기존 프로젝트 내용 보존)
+  if [ -f "$TEMPLATE_DIR/nextjs/CLAUDE.md" ]; then
+    _CLAUDE_MARKER='<!-- harness-init: DO NOT REMOVE -->'
+    if [ -f "$TARGET_DIR/CLAUDE.md" ] && grep -qF "$_CLAUDE_MARKER" "$TARGET_DIR/CLAUDE.md"; then
+      _user_prefix=$(awk -v marker="$_CLAUDE_MARKER" 'index($0, marker) { exit } { print }' "$TARGET_DIR/CLAUDE.md")
+      if [ -n "$_user_prefix" ]; then
+        { printf '%s\n' "$_user_prefix"; cat "$TEMPLATE_DIR/nextjs/CLAUDE.md"; } > "$TARGET_DIR/CLAUDE.md.harness-tmp"
+      else
+        cp "$TEMPLATE_DIR/nextjs/CLAUDE.md" "$TARGET_DIR/CLAUDE.md.harness-tmp"
+      fi
+      mv "$TARGET_DIR/CLAUDE.md.harness-tmp" "$TARGET_DIR/CLAUDE.md"
+    else
+      cp -f "$TEMPLATE_DIR/nextjs/CLAUDE.md" "$TARGET_DIR/CLAUDE.md"
+    fi
+    success "Next.js CLAUDE.md 적용 완료 (기존 프로젝트 내용 보존)"
+  fi
+
+  # .coderabbit.yaml 오버라이드 — 아직 JS 판(Controller → Service → Repository 문구)
+  # 그대로인 경우에만 교체한다. 사용자가 이미 손댔으면(문구가 사라졌으면) 보존한다.
+  if [ -f "$TEMPLATE_DIR/nextjs/.coderabbit.yaml" ]; then
+    if [ ! -f "$TARGET_DIR/.coderabbit.yaml" ] || \
+       grep -q 'Controller → Service → Repository' "$TARGET_DIR/.coderabbit.yaml" 2>/dev/null; then
+      cp -f "$TEMPLATE_DIR/nextjs/.coderabbit.yaml" "$TARGET_DIR/.coderabbit.yaml"
+      success ".coderabbit.yaml Next.js App Router 버전으로 교체"
+    fi
+  fi
+
+  # docs/DOC-SYNC-POLICY.md 오버라이드 (controller.ts 매핑 → route.ts/actions.ts 매핑)
+  if [ -f "$TEMPLATE_DIR/nextjs/docs/DOC-SYNC-POLICY.md" ]; then
+    mkdir -p "$TARGET_DIR/docs"
+    cp -f "$TEMPLATE_DIR/nextjs/docs/DOC-SYNC-POLICY.md" "$TARGET_DIR/docs/DOC-SYNC-POLICY.md"
+    success "Next.js DOC-SYNC-POLICY.md 적용 완료"
+  fi
+fi
+
 # ── CI 게이트 연결 확인 ────────────────────────────────
 # 워크플로는 사용자 소유라 cp -rn 이 기존 파일을 보존한다. 그래서 기존 설치는 로컬
 # pre-push 만 러너를 쓰고 CI 는 옛 명령을 돌리는 상태가 된다. 그러면 AGENTS.md 가

@@ -151,6 +151,71 @@ class JsInstallTests(HarnessTestCase):
         self.assertIn("node_modules/", gitignore)
 
 
+class NestjsInstallTests(HarnessTestCase):
+    """STACK=nestjs 는 nextjs 전용 오버라이드의 영향을 받지 않아야 한다.
+
+    templates/nextjs/ 를 추가하면서 STACK=nextjs 에만 걸리게 가드했다 — 이 클래스는
+    그 가드가 실제로 nestjs/express/node 를 건드리지 않는지 확인한다. 걸렸다면
+    NestJS 백엔드 프로젝트에 Controller 레이어가 없는 App Router 템플릿이 깔려
+    같은 문제가 반대 방향으로 재발한 것이다.
+    """
+
+    stack = "nestjs"
+    env_type = "js"
+
+    def test_install_succeeds(self):
+        self.assertEqual(self.result.returncode, 0, self.result.stderr[-2000:])
+
+    def test_controller_service_repository_architecture_kept(self):
+        architecture = self.read(".claude/rules/architecture.md")
+        self.assertIn("Controllers → Services → Repositories", architecture)
+
+    def test_agents_reference_controller_not_app_router(self):
+        architect = self.read(".claude/agents/architect.md")
+        self.assertIn("Controller", architect)
+        self.assertNotIn("Route Handler", architect)
+
+
+class NextjsAppRouterInstallTests(HarnessTestCase):
+    """STACK=nextjs 는 Controller/Service/Repository 가 아니라 App Router 레이어로 채워져야 한다.
+
+    kimsuhanmu 레포 실측: 백엔드 서버(NestJS) 가 없는 순수 Next.js App Router
+    프로젝트에 Controller/Service/Repository 템플릿이 그대로 깔려, 존재하지 않는
+    레이어(`*.controller.ts`)를 에이전트가 만들려는 문제가 있었다.
+    """
+
+    stack = "nextjs"
+    env_type = "js"
+
+    def test_install_succeeds(self):
+        self.assertEqual(self.result.returncode, 0, self.result.stderr[-2000:])
+
+    def test_architecture_rule_is_app_router_not_controller(self):
+        architecture = self.read(".claude/rules/architecture.md")
+        self.assertIn(
+            "Page / Route Handler / Server Action → Service → Repository", architecture
+        )
+        self.assertNotIn("Controller → Service → Repository", architecture)
+        self.assertNotIn("NestJS 예시", architecture)
+
+    def test_agents_reference_app_router_not_controller(self):
+        for name in ("analyst", "architect", "coder", "tester", "reviewer"):
+            content = self.read(f".claude/agents/{name}.md")
+            self.assertNotIn(
+                ".controller.ts", content, f"{name}.md 에 controller 레이어 잔재"
+            )
+            self.assertNotIn("NestJS", content, f"{name}.md 에 NestJS 잔재")
+
+    def test_doc_sync_policy_maps_route_ts_not_controller_ts(self):
+        policy = self.read("docs/DOC-SYNC-POLICY.md")
+        self.assertIn("route.ts", policy)
+        self.assertNotIn(".controller.ts", policy)
+
+    def test_coderabbit_critical_rules_is_app_router(self):
+        coderabbit = self.read(".coderabbit.yaml")
+        self.assertIn("Page/Route Handler/Server Action", coderabbit)
+
+
 class JsClaudeMdPreservationTests(unittest.TestCase):
     """JS 오버라이드가 기존 프로젝트 CLAUDE.md 를 지우면 안 된다.
 
@@ -158,6 +223,9 @@ class JsClaudeMdPreservationTests(unittest.TestCase):
     덮어써, 이미 있던 프로젝트 고유 내용(서비스 정체성·절대 규칙·진행 상황)이
     {project_name} 같은 플레이스홀더투성이 템플릿으로 완전히 사라졌다
     (kimsuhanmu 레포에서 실측). 재발 방지 회귀 테스트.
+
+    STACK=nextjs 픽스처를 쓰므로, JS 오버라이드 위에 다시 얹히는 Next.js
+    App Router 오버라이드까지 마커 보존 로직을 함께 통과하는지도 검증한다.
     """
 
     @classmethod
@@ -185,10 +253,13 @@ class JsClaudeMdPreservationTests(unittest.TestCase):
     def test_existing_project_content_survives(self):
         self.assertIn(self.marker_text, self.read("CLAUDE.md"))
 
-    def test_js_harness_section_still_applied(self):
-        # JS 아키텍처 규칙(Controller → Service → Repository)이 여전히 붙어야 한다 —
-        # 사용자 내용을 보존하려다 harness 섹션 자체가 안 붙는 회귀도 함께 잡는다.
-        self.assertIn("Controller → Service → Repository", self.read("CLAUDE.md"))
+    def test_nextjs_harness_section_still_applied(self):
+        # Next.js App Router 하네스 섹션이 여전히 붙어야 한다 — 사용자 내용을
+        # 보존하려다 harness 섹션 자체가 안 붙는 회귀도 함께 잡는다. 아키텍처
+        # 본문은 architecture.md 로 옮겨졌으므로(중복 제거) 참조 링크로 확인한다.
+        content = self.read("CLAUDE.md")
+        self.assertIn("레이어드 아키텍처 (App Router)", content)
+        self.assertIn(".claude/rules/architecture.md", content)
 
     def test_reinstall_keeps_single_copy_of_user_content(self):
         run_init(self.path, env_type="js")

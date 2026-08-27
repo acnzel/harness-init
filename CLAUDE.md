@@ -22,7 +22,8 @@ harness-init/
 ├── templates/
 │   ├── base-project/       ← 스택 미감지 시의 최소 하네스 (django/js 와 섞이지 않는다)
 │   ├── django/             ← Django/Python 전용 하네스 + 모든 스택의 베이스
-│   └── js/                 ← JS/TS 오버라이드 (django/ 위에 덮어쓰기)
+│   ├── js/                 ← JS/TS 오버라이드 (django/ 위에 덮어쓰기)
+│   └── nextjs/             ← Next.js App Router 오버라이드 (STACK=nextjs 일 때만 js/ 위에 한 번 더 덮어쓰기)
 └── scripts/
     ├── atomic_write.py     ← 원자적 파일 교체 (사람이 쓴 파일을 덮어쓰는 셋이 공용, 하네스 소유)
     ├── failure-report.py   ← 실패 이벤트를 재발 패턴으로 묶는다 (하네스 소유)
@@ -73,14 +74,20 @@ harness-init/
 10. **pre-commit 설정** — Python: ruff / JS·TS: prettier + eslint. lint baseline 포함
 11. **비 Django 스택이면 harness 마이그레이션** — `migration.sh` 가 템플릿 문구를 스택에 맞게 치환
 12. **JS 환경 전용 파일 오버라이드** — agents·rules·워크플로·CLAUDE.md·gates.json 등을 JS 판으로
-13. **CI 게이트 연결 확인** — 어느 워크플로도 `gate-runner` 를 안 부르면 전용 파일을 하나 추가
-14. **버전 기록** — `VERSION` 을 `.claude/harness-version` 에 남긴다. 대상 레포에서
+13. **Next.js App Router 전용 오버라이드 (JS 오버라이드 위에 다시 얹는다)** — `STACK=nextjs`
+    일 때만 agents·rules(architecture/testing/agents)·CLAUDE.md·DOC-SYNC-POLICY.md 를
+    Controller/Service/Repository(NestJS류) 판에서 App Router(Page/Route
+    Handler/Server Action → Service → Repository) 판으로 다시 교체. `.coderabbit.yaml`
+    은 gates.json 과 같은 규칙 — 파일이 없거나 아직 JS 기본 지문(`Controller →
+    Service → Repository`)이 남아 있을 때만 교체하고, 사용자가 이미 손댔으면 보존한다
+14. **CI 게이트 연결 확인** — 어느 워크플로도 `gate-runner` 를 안 부르면 전용 파일을 하나 추가
+15. **버전 기록** — `VERSION` 을 `.claude/harness-version` 에 남긴다. 대상 레포에서
     어느 판이 깔렸는지 확인할 수 있어야 갱신 여부를 판정할 수 있다
-15. **AGENTS.md 자동 구간 렌더** — `render-agents.py`
-16. **구조 지식 계층 (codegraph)** — 선택 의존성. 없으면 안내만
-17. **의미 지식 계층 (DOMAIN.md)** — `domain-init.sh` + `domain-fill.sh`
-18. **완료 메시지**
-19. **설치 직후 게이트 실측** — `gate-runner --stage pre-push` 를 한 번 돌려 현실을 보여준다
+16. **AGENTS.md 자동 구간 렌더** — `render-agents.py`
+17. **구조 지식 계층 (codegraph)** — 선택 의존성. 없으면 안내만
+18. **의미 지식 계층 (DOMAIN.md)** — `domain-init.sh` + `domain-fill.sh`
+19. **완료 메시지**
+20. **설치 직후 게이트 실측** — `gate-runner --stage pre-push` 를 한 번 돌려 현실을 보여준다
 
 ### 순서가 고정된 지점
 
@@ -89,9 +96,9 @@ harness-init/
 | 단계 | 반드시 이 뒤에 | 어기면 |
 |---|---|---|
 | 게이트 자가진단 주입(7) | settings.json 생성(6) | 읽을 파일이 없어 `sys.exit(0)` 으로 조용히 건너뛴다 |
-| CI 게이트 연결 확인(13) | `.github` 워크플로 복사(8) | `workflows/` 가 없어 조건문 전체를 지나친다 |
-| AGENTS.md 렌더(15) | gates.json 확정(12) | 문서가 JS 교체 전 게이트 목록을 박제한다 |
-| 게이트 실측(19) | gates.json 확정(12) | 교체 전 목록으로 돌려 실제와 다른 결과를 보여준다 |
+| CI 게이트 연결 확인(14) | `.github` 워크플로 복사(8) | `workflows/` 가 없어 조건문 전체를 지나친다 |
+| AGENTS.md 렌더(16) | gates.json 확정(12) | 문서가 JS 교체 전 게이트 목록을 박제한다 |
+| 게이트 실측(20) | gates.json 확정(12) | 교체 전 목록으로 돌려 실제와 다른 결과를 보여준다 |
 
 넷 다 **조용한 실패**다. 순서를 어겨도 `init.sh` 는 exit 0 으로 끝나고 완료
 메시지까지 출력한다. 새 단계를 넣을 때 위치를 눈으로만 고르지 말 것.
@@ -109,6 +116,7 @@ harness-init/
 | 최소 하네스 | `templates/base-project/` | 스택 미감지 시에만. CLAUDE.md·settings.json·훅 2개·.gitignore 로 끝내고 전체 설치를 건너뛴다 |
 | Python 공통 | `templates/django/` | 프로젝트 루트에 복사 |
 | JS 오버라이드 | `templates/js/` | `templates/django/` 위에 덮어쓰기 |
+| Next.js 오버라이드 | `templates/nextjs/` | `STACK=nextjs` 일 때만 `templates/js/` 위에 한 번 더 덮어쓰기 (Controller/Service/Repository → App Router) |
 
 `base-project/` 는 오버라이드 계층이 아니라 **분기**다. 스택을 못 찾았을 때 `init.sh` 가
 여기까지만 깔고 `SKIP_FULL_INSTALL` 로 빠져나간다. 감지되는 스택에는 쓰이지 않는다.

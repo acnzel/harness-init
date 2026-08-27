@@ -12,6 +12,33 @@ harness-init 은 남의 레포에 주입되고 재실행으로 갱신된다. 그
 
 ---
 
+## 1.3.0
+
+kimsuhanmu 레포(Next.js App Router + Supabase, 별도 백엔드 서버 없음)에 `STACK=nextjs`
+로 실제 설치해 보고 발견한 결함을 고쳤다.
+
+### 추가
+
+- **`templates/nextjs/` — Next.js App Router 전용 오버라이드 계층.** 기존
+  `templates/js/` 는 `nextjs`/`nestjs`/`express`/`node` 를 구분 없이 같은
+  Controller/Service/Repository(NestJS류 백엔드) 템플릿으로 채웠다. App Router
+  단독 프로젝트(별도 백엔드 서버 없음)에는 Controller 레이어 자체가 없어, 에이전트가
+  존재하지 않는 레이어(`*.controller.ts`)를 만들려 하는 문제가 실제로 발생했다
+  (kimsuhanmu 레포 실측). `STACK` 이 `nextjs` 로 감지되면 JS 오버라이드 위에 이
+  계층을 한 번 더 덮어써 agents 5종·`architecture.md`/`testing.md`/`agents.md`
+  rules·CLAUDE.md·`DOC-SYNC-POLICY.md` 를 Page/Route Handler/Server Action →
+  Service → Repository 구조로 교체한다. `.coderabbit.yaml` 은 사용자 소유
+  설정이라 파일이 없거나 아직 JS 기본 지문(`Controller → Service → Repository`)
+  그대로일 때만 교체하고, 손댄 흔적이 있으면 보존한다. `nestjs`/`express`/
+  `node` 는 기존 Controller/Service/Repository 판을 그대로 받는다 — 회귀
+  테스트(`NestjsInstallTests`)로 고정했다.
+- 회귀 테스트에 `nestjs` 스택 픽스처(`@nestjs/core` 마커) 추가. 지금까지
+  `templates/js/` 를 검증하는 테스트가 전부 `nextjs` 픽스처만 썼는데, 이제
+  `nextjs`/`nestjs` 가 서로 다른 결과를 내야 하므로 실제 NestJS 감지 경로도
+  픽스처로 검증한다.
+
+---
+
 ## 1.2.0
 
 kimsuhanmu 레포에 실제로 설치해 보고 발견한 세 가지 결함을 고쳤다. 전부 "재실행하면

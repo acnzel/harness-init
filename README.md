@@ -770,16 +770,27 @@ cp .claude/decisions/adr-template.md .claude/decisions/001-auth-strategy.md
 
 ## 지원 환경
 
-| 환경 | 템플릿 | 에이전트 | 테스트 | pre-commit |
-|------|--------|---------|-------|-----------|
-| Django / FastAPI / Flask | `templates/django/` | pytest + Factory + PropertyMock | ruff + ruff-format + domain-gate | stdlib `ast` (정밀) |
-| Next.js / NestJS / Express | `templates/js/` | jest/vitest + factory functions + jest.spyOn | prettier + eslint + domain-gate | 선언 블록 지문 (TS enum / `as const` / 리터럴 union / Prisma) |
+| 환경 | 템플릿 | 아키텍처 | 에이전트 | 테스트 | pre-commit |
+|------|--------|---------|---------|-------|-----------|
+| Django / FastAPI / Flask | `templates/django/` | Views → Services → Repositories | pytest + Factory + PropertyMock | ruff + ruff-format + domain-gate | stdlib `ast` (정밀) |
+| NestJS / Express / Node | `templates/js/` | Controller → Service → Repository | jest/vitest + factory functions + jest.spyOn | prettier + eslint + domain-gate | 선언 블록 지문 (TS enum / `as const` / 리터럴 union / Prisma) |
+| Next.js (App Router) | `templates/js/` + `templates/nextjs/` | Page/Route Handler/Server Action → Service → Repository | vitest/jest(모듈 mock) + Playwright | prettier + eslint + domain-gate | 선언 블록 지문 (TS enum / `as const` / 리터럴 union / Prisma) |
 
 JS/TS 환경은 Django 공통 파일(skills, commands, hooks, docs)을 그대로 재사용하고,
 에이전트·rules·CLAUDE.md·DOMAIN.md·.coderabbit.yaml·pre-commit·워크플로우(`pr-test.yml`, `post-merge-docs.yml`)만
 JS 전용으로 교체됩니다. (`pre-bash-guard.sh` 만 Django migrate 경고를 뺀 JS 버전으로 바뀝니다.)
 
-스택을 감지하지 못하면 위 두 계층 대신 `templates/base-project/` 의 최소 하네스만 깔고
+`STACK` 이 `nextjs` 로 감지되면 위 JS 오버라이드 위에 `templates/nextjs/` 를 한 번 더
+덮어씁니다. `templates/js/` 는 별도 백엔드 서버(NestJS/Express)를 전제로 Controller/
+Service/Repository 레이어를 가정하는데, App Router 단독 프로젝트에는 Controller
+레이어 자체가 없기 때문입니다 — 에이전트·`architecture.md`/`testing.md`/`agents.md`
+rules·CLAUDE.md·DOC-SYNC-POLICY.md 는 무조건 App Router 판으로 교체되고,
+gates.json·워크플로우·gitignore 등 스택 무관 항목은 JS 오버라이드 결과를 그대로 씁니다.
+`.coderabbit.yaml` 은 사용자 소유 설정이라 파일이 없거나 아직 JS 기본 지문
+(`Controller → Service → Repository`)이 남아 있을 때만 App Router 판으로 교체하고,
+이미 손댔으면 그대로 둡니다.
+
+스택을 감지하지 못하면 위 세 계층 대신 `templates/base-project/` 의 최소 하네스만 깔고
 끝냅니다. CLAUDE.md, settings.json, 훅 2개, .gitignore 가 전부이며, 에이전트·게이트·지식
 계층은 설치되지 않습니다. `package.json` 이나 `manage.py` 를 만든 뒤 다시 실행하거나
 `ENV_TYPE=python|js` 로 명시하면 전체 설치로 넘어갑니다.
@@ -813,16 +824,24 @@ harness-init/
 │   │   ├── .coderabbit.yaml
 │   │   ├── .github/
 │   │   └── docs/
-│   └── js/                       ← JS/TS 전용 오버라이드 템플릿
-│       ├── CLAUDE.md             ← Controller/Service/Repository + TypeScript 규칙
-│       ├── DOMAIN.md             ← JS ORM 스키마 안내 (Prisma/TypeORM/Mongoose/Drizzle)
-│       ├── .coderabbit.yaml      ← path_instructions 를 JS/TS 규칙으로 교체 (django 판 그대로면)
+│   ├── js/                       ← JS/TS 전용 오버라이드 템플릿 (django/ 위에 덮어쓰기)
+│   │   ├── CLAUDE.md             ← Controller/Service/Repository + TypeScript 규칙
+│   │   ├── DOMAIN.md             ← JS ORM 스키마 안내 (Prisma/TypeORM/Mongoose/Drizzle)
+│   │   ├── .coderabbit.yaml      ← path_instructions 를 JS/TS 규칙으로 교체 (django 판 그대로면)
+│   │   ├── .claude/
+│   │   │   ├── agents/           ← analyst/architect/coder/tester/reviewer (jest 기반)
+│   │   │   ├── rules/            ← architecture / testing / domain / agents / hooks (JS/TS 전용)
+│   │   └── .github/workflows/
+│   │       ├── pr-test.yml               ← Node.js 20 + npm ci + npm test
+│   │       └── post-merge-docs.yml       ← 머지 후 API 문서 갱신 이슈 자동 생성
+│   └── nextjs/                   ← Next.js App Router 전용 오버라이드 (STACK=nextjs 일 때만 js/ 위에 한 번 더 덮어쓰기)
+│       ├── CLAUDE.md             ← Page/Route Handler/Server Action → Service → Repository 규칙
+│       ├── .coderabbit.yaml      ← Critical Rules 를 App Router 레이어로 교체 (js 판 그대로면)
 │       ├── .claude/
-│       │   ├── agents/           ← analyst/architect/coder/tester/reviewer (jest 기반)
-│       │   ├── rules/            ← architecture / testing / domain / agents / hooks (JS/TS 전용)
-│       └── .github/workflows/
-│           ├── pr-test.yml               ← Node.js 20 + npm ci + npm test
-│           └── post-merge-docs.yml       ← 머지 후 API 문서 갱신 이슈 자동 생성
+│       │   ├── agents/           ← analyst/architect/coder/tester/reviewer (App Router 전용)
+│       │   ├── rules/            ← architecture / testing / agents (App Router 전용, 나머지는 js/ 재사용)
+│       └── docs/
+│           └── DOC-SYNC-POLICY.md        ← route.ts/actions.ts ↔ 문서 매핑
 └── scripts/
     ├── atomic_write.py           ← 원자적 파일 교체 (render-agents·commit-msg·lint-baseline 공용)
     ├── failure-report.py         ← 우회·차단·게이트 실패를 재발 패턴으로 묶는다

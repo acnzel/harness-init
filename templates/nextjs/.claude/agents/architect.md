@@ -38,11 +38,11 @@ model: opus
 - **입력**: `_workspace/01_ticket_analysis.md`
 - **출력**: `_workspace/02_architecture.md`
 - **형식**:
-  ```markdown
+  ````markdown
   # 설계: {TICKET-ID}
 
   ## 레이어 다이어그램
-  ```
+  ```text
   [app/{feature}/actions.ts → submitItem(userId, data)]
     └→ {domain}Service.createItem(userId, data)
          └→ {domain}Repository.insert(data) → Entity
@@ -65,7 +65,7 @@ model: opus
 
   ## 신규 ADR
   <!-- 기준 해당 시만 작성. 해당 없으면 "없음" -->
-  ```
+  ````
 
 ## 팀 통신 프로토콜
 

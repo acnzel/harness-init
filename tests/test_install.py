@@ -254,12 +254,12 @@ class JsClaudeMdPreservationTests(unittest.TestCase):
         self.assertIn(self.marker_text, self.read("CLAUDE.md"))
 
     def test_nextjs_harness_section_still_applied(self):
-        # Next.js App Router 아키텍처 규칙이 여전히 붙어야 한다 — 사용자 내용을
-        # 보존하려다 harness 섹션 자체가 안 붙는 회귀도 함께 잡는다.
-        self.assertIn(
-            "Page/Route Handler/Server Action → Service → Repository",
-            self.read("CLAUDE.md"),
-        )
+        # Next.js App Router 하네스 섹션이 여전히 붙어야 한다 — 사용자 내용을
+        # 보존하려다 harness 섹션 자체가 안 붙는 회귀도 함께 잡는다. 아키텍처
+        # 본문은 architecture.md 로 옮겨졌으므로(중복 제거) 참조 링크로 확인한다.
+        content = self.read("CLAUDE.md")
+        self.assertIn("레이어드 아키텍처 (App Router)", content)
+        self.assertIn(".claude/rules/architecture.md", content)
 
     def test_reinstall_keeps_single_copy_of_user_content(self):
         run_init(self.path, env_type="js")

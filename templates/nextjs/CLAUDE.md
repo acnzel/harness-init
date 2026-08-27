@@ -26,25 +26,9 @@ git·파일시스템 파괴 명령은 [`AGENTS.md`](./AGENTS.md)의 자동 구�
 
 ## 레이어드 아키텍처 (App Router)
 
-참조 구현 기능(`{reference_feature}`)을 기준으로 새 기능을 작성. 의존성 방향은
-**Page/Route Handler/Server Action → Service → Repository** (역방향/건너뛰기 금지)
-
-```
-app/
-├── {feature}/
-│   ├── page.tsx             # RSC — UI 렌더링 + 읽기 전용 Service 호출
-│   └── actions.ts           # Server Actions — 쓰기는 Service 호출로 위임
-├── api/
-│   └── {endpoint}/
-│       └── route.ts         # Route Handler — 외부/클라이언트 호출용. Service 호출만 허용
-lib/
-├── {feature}/
-│   ├── service.ts           # 비즈니스 로직. Repository 호출만 허용
-│   └── repository.ts        # DB 접근 (Prisma/Drizzle/Supabase client 등)
-```
-
-별도 백엔드 서버(NestJS/Express) 없이 Next.js만으로 API·UI를 함께 서빙한다는 전제다.
-하이브리드 구성(별도 백엔드 병행)이면 이 섹션을 프로젝트에 맞게 직접 조정할 것.
+레이어 구조·디렉토리 배치·절대 금지 규칙의 정본은
+[`.claude/rules/architecture.md`](./.claude/rules/architecture.md)다. 여기에 다시
+적지 않는다 — 요약이 원본과 어긋나는 드리프트를 막기 위해서다.
 
 ## 환경 설정
 
@@ -57,35 +41,8 @@ lib/
 
 ## 테스트 작성 규칙
 
-**CRITICAL**: 테스트 코드 작성 전 반드시 아래 절차를 따를 것.
-
-### Step 1. 의존성 분석 (필수 선행)
-대상 기능의 Service·Repository 의존성과 외부 호출을 파악하고 mock 대상을 결정한다.
-
-### Step 2. 모듈 단위 모킹
-```typescript
-// ✅ 모듈 모킹 — vi.mock / jest.mock
-vi.mock('@/lib/user/repository');
-
-// ✅ 함수 모킹
-vi.spyOn(userService, 'findOne').mockResolvedValue(mockUser);
-```
-
-### Step 3. 테스트 데이터는 팩토리 함수로
-`test/factories/` 또는 `test/fixtures/`에 정의된 팩토리 함수를 사용. DB 인스턴스 직접 생성 최소화.
-
-### 레이어별 테스트 범위
-
-| 레이어 | 무엇을 테스트 | 무엇을 mock |
-|-------|-------------|-----------|
-| Page (RSC) | 렌더된 내용·데이터 페칭 결과 | Service 함수 (unit) / 없음 (e2e) |
-| Route Handler / Server Action | 응답 코드/본문, Service 호출 여부 | Service 함수 |
-| Service | 비즈니스 로직 분기, Repository 호출 여부 | Repository 함수 |
-| Repository | 실제 쿼리 결과 | mock 없음 (테스트 DB) |
-
-RSC(Server Component)는 jsdom 기반 unit 테스트가 까다롭다. 데이터 페칭/가공 로직은
-`lib/{feature}/service.ts`로 분리해 그쪽을 unit 테스트하고, 실제 렌더 결과는 e2e(예:
-Playwright)로 검증한다.
+테스트 절차·레이어별 범위·모킹 규칙은 [`.claude/rules/testing.md`](./.claude/rules/testing.md)가
+정본이다. 여기에 다시 적지 않는다 — 요약이 원본과 어긋나는 드리프트를 막기 위해서다.
 
 ## 지식 계층 — 구조는 codegraph, 의미는 DOMAIN.md
 

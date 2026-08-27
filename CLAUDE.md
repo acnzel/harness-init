@@ -75,9 +75,11 @@ harness-init/
 11. **비 Django 스택이면 harness 마이그레이션** — `migration.sh` 가 템플릿 문구를 스택에 맞게 치환
 12. **JS 환경 전용 파일 오버라이드** — agents·rules·워크플로·CLAUDE.md·gates.json 등을 JS 판으로
 13. **Next.js App Router 전용 오버라이드 (JS 오버라이드 위에 다시 얹는다)** — `STACK=nextjs`
-    일 때만 agents·rules(architecture/testing/agents)·CLAUDE.md·.coderabbit.yaml·
-    DOC-SYNC-POLICY.md 를 Controller/Service/Repository(NestJS류) 판에서 App
-    Router(Page/Route Handler/Server Action → Service → Repository) 판으로 다시 교체
+    일 때만 agents·rules(architecture/testing/agents)·CLAUDE.md·DOC-SYNC-POLICY.md 를
+    Controller/Service/Repository(NestJS류) 판에서 App Router(Page/Route
+    Handler/Server Action → Service → Repository) 판으로 다시 교체. `.coderabbit.yaml`
+    은 gates.json 과 같은 규칙 — 파일이 없거나 아직 JS 기본 지문(`Controller →
+    Service → Repository`)이 남아 있을 때만 교체하고, 사용자가 이미 손댔으면 보존한다
 14. **CI 게이트 연결 확인** — 어느 워크플로도 `gate-runner` 를 안 부르면 전용 파일을 하나 추가
 15. **버전 기록** — `VERSION` 을 `.claude/harness-version` 에 남긴다. 대상 레포에서
     어느 판이 깔렸는지 확인할 수 있어야 갱신 여부를 판정할 수 있다

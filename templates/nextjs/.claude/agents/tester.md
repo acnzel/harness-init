@@ -28,12 +28,14 @@ model: opus
   vi.spyOn(userService, 'findOne').mockResolvedValue(mockUser);
   ```
 - **레이어별 테스트 범위**:
+
   | 레이어 | 무엇을 테스트 | 무엇을 mock |
   |-------|-------------|-----------|
   | Page (RSC) | 렌더된 내용·데이터 페칭 결과 | Service 함수 (unit) / 없음 (e2e) |
   | Route Handler / Server Action | 응답 코드/본문, Service 호출 여부 | Service 함수 |
   | Service | 비즈니스 로직 분기, Repository 호출 여부 | Repository 함수 |
   | Repository | 실제 쿼리 결과 | mock 없음 (테스트 DB / Prisma 클라이언트 mock) |
+
 - **Vitest/Jest + Playwright 사용**: `npx vitest run` 또는 `npm test`, e2e는 `npx playwright test`로 실행 가능해야 함
 - **DRY 헬퍼 함수**: 동일 생성 패턴이 3회 이상 반복되면 `createXxx(overrides?)` 헬퍼로 추출
 - **외과적 변경**: 테스트 파일 수정 시에도 관련 없는 테스트는 건드리지 않는다

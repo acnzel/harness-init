@@ -5,7 +5,7 @@
 
 **예외: 크론/배치 스크립트** — 직접 DB 접근을 허용하며, 기존 배치 스크립트 패턴을 따른다.
 
-```
+```text
 app/
 ├── {feature}/
 │   ├── page.tsx              # RSC. UI 렌더링 + 읽기 전용 Service 호출만
@@ -21,9 +21,9 @@ lib/
 ```
 
 이 프로젝트는 별도 백엔드 서버(NestJS/Express) 없이 Next.js App Router만으로 API와
-UI를 함께 서빙한다는 전제다. NestJS 등 별도 백엔드가 있는 하이브리드 구성이면
-`.claude/rules/architecture.md`를 프로젝트에 맞게 직접 조정할 것 — 이 문서는 갱신되지
-않는다.
+UI를 함께 서빙한다는 전제다. 하이브리드 구성(별도 백엔드 병행)이면 이 문서 대신
+프로젝트 루트 `CLAUDE.md`에 실제 구조를 적을 것 — 이 파일은 harness 소유 규칙이라
+`init.sh`를 재실행하면 이 판으로 다시 덮어써진다.
 
 ## 절대 금지
 
@@ -33,4 +33,4 @@ UI를 함께 서빙한다는 전제다. NestJS 등 별도 백엔드가 있는 �
 | Service에서 DB 직접 접근 금지 | Repository를 통해서만 접근 |
 | 레이어 건너뛰기 금지 | Page/Route Handler/Server Action → Service → Repository 순서 엄수 |
 | `any` 타입 사용 금지 | 명시적 타입 또는 `unknown` 사용 |
-| 테스트에서 직접 DB 쿼리 금지 | Mock/Stub 또는 인메모리 DB 사용 |
+| Repository 외 레이어에서 직접 DB 쿼리 금지 | Repository 테스트는 테스트 DB/DB 클라이언트 mock 사용, 그 외는 Mock/Stub |

@@ -4,7 +4,7 @@ Next.js App Router 프로젝트 전용 5인 에이전트 팀. 기능 개발 및 
 
 ## 파이프라인
 
-```
+```text
 analyst → architect → coder ⇄ tester → reviewer
 ```
 

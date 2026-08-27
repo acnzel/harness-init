@@ -784,8 +784,11 @@ JS 전용으로 교체됩니다. (`pre-bash-guard.sh` 만 Django migrate 경고�
 덮어씁니다. `templates/js/` 는 별도 백엔드 서버(NestJS/Express)를 전제로 Controller/
 Service/Repository 레이어를 가정하는데, App Router 단독 프로젝트에는 Controller
 레이어 자체가 없기 때문입니다 — 에이전트·`architecture.md`/`testing.md`/`agents.md`
-rules·CLAUDE.md·.coderabbit.yaml·DOC-SYNC-POLICY.md 만 App Router 판으로 교체되고,
+rules·CLAUDE.md·DOC-SYNC-POLICY.md 는 무조건 App Router 판으로 교체되고,
 gates.json·워크플로우·gitignore 등 스택 무관 항목은 JS 오버라이드 결과를 그대로 씁니다.
+`.coderabbit.yaml` 은 사용자 소유 설정이라 파일이 없거나 아직 JS 기본 지문
+(`Controller → Service → Repository`)이 남아 있을 때만 App Router 판으로 교체하고,
+이미 손댔으면 그대로 둡니다.
 
 스택을 감지하지 못하면 위 세 계층 대신 `templates/base-project/` 의 최소 하네스만 깔고
 끝냅니다. CLAUDE.md, settings.json, 훅 2개, .gitignore 가 전부이며, 에이전트·게이트·지식
